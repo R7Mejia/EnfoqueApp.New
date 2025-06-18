@@ -1,8 +1,13 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+
+interface Duration {
+  label: string;
+  value: number;
+}
 
 interface DurationSelectorProps {
-  durations: number[];
+  durations: Duration[];
   selectedDuration: number;
   onSelect: (duration: number) => void;
   disabled?: boolean;
@@ -15,39 +20,42 @@ export default function DurationSelector({
   disabled = false 
 }: DurationSelectorProps) {
   return (
-    <View style={styles.container}>
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.container}>
       {durations.map((duration) => (
         <TouchableOpacity
-          key={duration}
+          key={duration.value}
           style={[
             styles.durationButton,
-            selectedDuration === duration && styles.selectedDuration,
+            selectedDuration === duration.value && styles.selectedDuration,
             disabled && styles.disabledButton,
           ]}
-          onPress={() => !disabled && onSelect(duration)}
+          onPress={() => !disabled && onSelect(duration.value)}
           disabled={disabled}>
           <Text
             style={[
               styles.durationText,
-              selectedDuration === duration && styles.selectedDurationText,
+              selectedDuration === duration.value && styles.selectedDurationText,
               disabled && styles.disabledText,
             ]}>
-            {duration}m
+            {duration.label}
           </Text>
         </TouchableOpacity>
       ))}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    justifyContent: 'center',
     gap: 12,
+    paddingHorizontal: 4,
   },
   durationButton: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 25,
     backgroundColor: '#F3F4F6',
@@ -69,7 +77,7 @@ const styles = StyleSheet.create({
   },
   durationText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
+    fontSize: 14,
     color: '#4B5563',
   },
   selectedDurationText: {

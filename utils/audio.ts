@@ -9,7 +9,7 @@ export class AudioService {
       if (Platform.OS !== 'web') {
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
-          staysActiveInBackground: false,
+          staysActiveInBackground: true, // Allow audio to play when screen is off
           playsInSilentModeIOS: true,
           shouldDuckAndroid: true,
           playThroughEarpieceAndroid: false,
@@ -32,6 +32,7 @@ export class AudioService {
         // Web-specific audio handling
         if (soundUri) {
           const audio = new window.Audio(soundUri);
+          audio.volume = 0.7;
           audio.play().catch(() => {
             this.playSystemNotification();
           });
@@ -44,7 +45,10 @@ export class AudioService {
           ? { uri: soundUri }
           : require('../assets/sounds/default-bell.mp3');
 
-        const { sound } = await Audio.Sound.createAsync(source);
+        const { sound } = await Audio.Sound.createAsync(source, {
+          shouldPlay: true,
+          volume: 0.7,
+        });
         this.sound = sound;
         await sound.playAsync();
       }
@@ -86,8 +90,13 @@ export class AudioService {
 
   static async cleanup() {
     if (this.sound) {
-      await this.sound.unloadAsync();
-      this.sound = null;
+      try {
+        await this.sound.stopAsync();
+        await this.sound.unloadAsync();
+        this.sound = null;
+      } catch (error) {
+        console.error('Error cleaning up sound:', error);
+      }
     }
   }
 }

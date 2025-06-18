@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Clock, ListTodo, Settings } from 'lucide-react-native';
+import { Clock, ListTodo, Settings, Home } from 'lucide-react-native';
 import { StyleSheet, Platform } from 'react-native';
 
 export default function TabLayout() {
@@ -15,6 +15,13 @@ export default function TabLayout() {
       }}>
       <Tabs.Screen
         name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="focus"
         options={{
           title: 'Focus',
           tabBarIcon: ({ color, size }) => <Clock size={size} color={color} />,

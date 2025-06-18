@@ -1,0 +1,360 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  ImageBackground,
+  Platform,
+  Alert,
+  Dimensions,
+} from 'react-native';
+import { Play, Pause, RefreshCw } from 'lucide-react-native';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import TimerDisplay from '@/components/TimerDisplay';
+import DurationSelector from '@/components/DurationSelector';
+import BreakModal from '@/components/BreakModal';
+import { StorageService } from '@/utils/storage';
+import { AudioService } from '@/utils/audio';
+
+const { width } = Dimensions.get('window');
+
+export default function FocusScreen() {
+  const [task, setTask] = useState('');
+  const [timeLeft, setTimeLeft] = useState(25 * 60);
+  const [isRunning, setIsRunning] = useState(false);
+  const [selectedDuration, setSelectedDuration] = useState(25);
+  const [activities, setActivities] = useState<string[]>([]);
+  const [showBreakModal, setShowBreakModal] = useState(false);
+  const [currentActivity, setCurrentActivity] = useState('');
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [customSound, setCustomSound] = useState<string | null>(null);
+  
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Extended duration options from 30 seconds to 60 minutes
+  const durations = [
+    { label: '30s', value: 0.5 },
+    { label: '1m', value: 1 },
+    { label: '5m', value: 5 },
+    { label: '10m', value: 10 },
+    { label: '15m', value: 15 },
+    { label: '25m', value: 25 },
+    { label: '30m', value: 30 },
+    { label: '45m', value: 45 },
+    { label: '60m', value: 60 },
+  ];
+
+  useEffect(() => {
+    loadData();
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      if (Platform.OS !== 'web') {
+        deactivateKeepAwake();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isRunning && timeLeft > 0) {
+      if (Platform.OS !== 'web') {
+        activateKeepAwakeAsync();
+      }
+      intervalRef.current = setInterval(() => {
+        setTimeLeft((prevTime) => {
+          const newTime = prevTime - 1;
+          if (newTime <= 0) {
+            handleTimerComplete();
+            return 0;
+          }
+          return newTime;
+        });
+      }, 1000);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      if (Platform.OS !== 'web') {
+        deactivateKeepAwake();
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isRunning, timeLeft]);
+
+  const loadData = async () => {
+    try {
+      const [loadedActivities, loadedBackground, loadedSound] = await Promise.all([
+        StorageService.getActivities(),
+        StorageService.getBackgroundImage(),
+        StorageService.getCustomSound(),
+      ]);
+      
+      setActivities(loadedActivities);
+      setBackgroundImage(loadedBackground);
+      setCustomSound(loadedSound);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
+  };
+
+  const handleTimerComplete = async () => {
+    setIsRunning(false);
+    if (Platform.OS !== 'web') {
+      deactivateKeepAwake();
+    }
+    
+    // Play completion sound
+    await AudioService.playSound(customSound || undefined);
+    
+    // Show break activity if available
+    if (activities.length > 0) {
+      const randomActivity = activities[Math.floor(Math.random() * activities.length)];
+      setCurrentActivity(randomActivity);
+      setShowBreakModal(true);
+    } else {
+      if (Platform.OS === 'web') {
+        alert('Focus Session Complete!\n\nGreat job! Add some reward activities in the Activities tab for your next break.');
+      } else {
+        Alert.alert(
+          'Focus Session Complete!',
+          'Great job! Add some reward activities in the Activities tab for your next break.',
+          [{ text: 'OK' }]
+        );
+      }
+    }
+  };
+
+  const toggleTimer = () => {
+    if (!task.trim()) {
+      if (Platform.OS === 'web') {
+        alert('Task Required\n\nPlease enter what you want to focus on.');
+      } else {
+        Alert.alert('Task Required', 'Please enter what you want to focus on.');
+      }
+      return;
+    }
+    setIsRunning(!isRunning);
+  };
+
+  const resetTimer = () => {
+    setIsRunning(false);
+    setTimeLeft(selectedDuration * 60);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+
+  const handleDurationSelect = (duration: number) => {
+    if (!isRunning) {
+      setSelectedDuration(duration);
+      setTimeLeft(duration * 60);
+    }
+  };
+
+  const getNewActivity = () => {
+    if (activities.length > 1) {
+      let newActivity;
+      do {
+        newActivity = activities[Math.floor(Math.random() * activities.length)];
+      } while (newActivity === currentActivity && activities.length > 1);
+      setCurrentActivity(newActivity);
+    }
+  };
+
+  const defaultBackground = 'https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=1200';
+
+  return (
+    <ImageBackground
+      source={{ uri: backgroundImage || defaultBackground }}
+      style={styles.backgroundImage}
+      blurRadius={2}>
+      <View style={styles.overlay}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Focus Timer</Text>
+            <Text style={styles.subtitle}>Stay focused, be productive</Text>
+          </View>
+
+          <View style={styles.taskSection}>
+            <Text style={styles.taskLabel}>What would you like to focus on?</Text>
+            <TextInput
+              style={styles.taskInput}
+              value={task}
+              onChangeText={setTask}
+              placeholder="Enter your task..."
+              placeholderTextColor="#9CA3AF"
+              maxLength={100}
+              multiline={false}
+            />
+          </View>
+
+          <View style={styles.durationSection}>
+            <Text style={styles.durationLabel}>Duration</Text>
+            <DurationSelector
+              durations={durations}
+              selectedDuration={selectedDuration}
+              onSelect={handleDurationSelect}
+              disabled={isRunning}
+            />
+          </View>
+
+          <TimerDisplay timeLeft={timeLeft} isRunning={isRunning} />
+
+          <View style={styles.controls}>
+            <TouchableOpacity 
+              style={[styles.controlButton, isRunning && styles.controlButtonDisabled]} 
+              onPress={resetTimer}
+              disabled={isRunning}>
+              <RefreshCw size={24} color={isRunning ? "#9CA3AF" : "#4B5563"} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.startButton, !task.trim() && styles.startButtonDisabled]}
+              onPress={toggleTimer}
+              disabled={!task.trim()}>
+              {isRunning ? (
+                <Pause size={28} color="#FFFFFF" />
+              ) : (
+                <Play size={28} color="#FFFFFF" />
+              )}
+              <Text style={styles.startButtonText}>
+                {isRunning ? 'Pause' : 'Start Focusing'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <BreakModal
+          visible={showBreakModal}
+          activity={currentActivity}
+          onClose={() => setShowBreakModal(false)}
+          onNewActivity={getNewActivity}
+        />
+      </View>
+    </ImageBackground>
+  );
+}
+
+const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(249, 250, 251, 0.95)',
+  },
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'web' ? 40 : 60,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  title: {
+    fontFamily: 'SpaceGrotesk-Bold',
+    fontSize: 32,
+    color: '#7C3AED',
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  taskSection: {
+    marginBottom: 32,
+  },
+  taskLabel: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 18,
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  taskInput: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    color: '#1F2937',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    minHeight: 56,
+  },
+  durationSection: {
+    marginBottom: 40,
+  },
+  durationLabel: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 18,
+    color: '#1F2937',
+    marginBottom: 16,
+  },
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 20,
+    marginBottom: Platform.OS === 'web' ? 40 : 60,
+  },
+  controlButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  controlButtonDisabled: {
+    opacity: 0.5,
+  },
+  startButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#7C3AED',
+    borderRadius: 25,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    gap: 12,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    minWidth: width * 0.6,
+    justifyContent: 'center',
+  },
+  startButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    shadowColor: '#9CA3AF',
+  },
+  startButtonText: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+});

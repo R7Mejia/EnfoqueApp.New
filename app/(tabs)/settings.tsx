@@ -9,7 +9,7 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
-import { Upload, Volume2, Trash2, Image as ImageIcon } from 'lucide-react-native';
+import { Upload, Volume2, Trash2, Image as ImageIcon, Square } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { StorageService } from '@/utils/storage';
@@ -19,6 +19,7 @@ export default function SettingsScreen() {
   const [customSound, setCustomSound] = useState<string | null>(null);
   const [customSoundName, setCustomSoundName] = useState<string | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [isTestingSound, setIsTestingSound] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -100,16 +101,31 @@ export default function SettingsScreen() {
     }
   };
 
-  const testSound = async () => {
+  const testSound = async (soundUri?: string) => {
     try {
-      await AudioService.testSound(customSound || undefined);
+      setIsTestingSound(true);
+      await AudioService.testSound(soundUri);
+      // Auto-stop after 3 seconds for testing
+      setTimeout(() => {
+        setIsTestingSound(false);
+      }, 3000);
     } catch (error) {
       console.error('Error testing sound:', error);
+      setIsTestingSound(false);
       if (Platform.OS === 'web') {
         alert('Error\n\nFailed to play sound. Please check your audio file.');
       } else {
         Alert.alert('Error', 'Failed to play sound. Please check your audio file.');
       }
+    }
+  };
+
+  const stopTestSound = async () => {
+    try {
+      await AudioService.cleanup();
+      setIsTestingSound(false);
+    } catch (error) {
+      console.error('Error stopping sound:', error);
     }
   };
 
@@ -138,9 +154,9 @@ export default function SettingsScreen() {
         setBackgroundImage(asset.uri);
         
         if (Platform.OS === 'web') {
-          alert('Success!\n\nBackground image updated successfully!');
+          alert('Success!\n\nBackground image updated successfully! Go to the Home or Focus tab to see your new background.');
         } else {
-          Alert.alert('Success', 'Background image updated successfully!');
+          Alert.alert('Success', 'Background image updated successfully! Go to the Home or Focus tab to see your new background.');
         }
       }
     } catch (error) {
@@ -186,21 +202,53 @@ export default function SettingsScreen() {
         <Text style={styles.subtitle}>Customize your experience</Text>
       </View>
 
+      {/* Background Image Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Background Image</Text>
+        <Text style={styles.sectionDescription}>
+          Choose a custom background for your home and focus screens
+        </Text>
+
+        {backgroundImage && (
+          <View style={styles.currentBackground}>
+            <Image source={{ uri: backgroundImage }} style={styles.backgroundPreview} />
+            <TouchableOpacity
+              style={styles.removeImageButton}
+              onPress={removeBackgroundImage}>
+              <Trash2 size={16} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <TouchableOpacity style={styles.backgroundButton} onPress={pickBackgroundImage}>
+          <ImageIcon size={20} color="#7C3AED" />
+          <Text style={styles.backgroundButtonText}>
+            {backgroundImage ? 'Change Background' : 'Choose Background'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Timer Sound Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Timer Sound</Text>
         <Text style={styles.sectionDescription}>
-          Choose your focus timer sound
+          Choose your focus timer completion sound
         </Text>
 
         <View style={styles.soundOptions}>
           <View style={styles.soundOption}>
             <Text style={styles.soundOptionLabel}>Default Bell</Text>
             <TouchableOpacity
-              style={styles.testButton}
-              onPress={() => AudioService.testSound()}>
-              <Volume2 size={20} color="#7C3AED" />
-              <Text style={styles.testButtonText}>Test</Text>
+              style={[styles.testButton, isTestingSound && styles.testButtonActive]}
+              onPress={() => isTestingSound ? stopTestSound() : testSound()}>
+              {isTestingSound ? (
+                <Square size={20} color="#EF4444" />
+              ) : (
+                <Volume2 size={20} color="#7C3AED" />
+              )}
+              <Text style={[styles.testButtonText, isTestingSound && styles.testButtonTextActive]}>
+                {isTestingSound ? 'Stop' : 'Test'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -208,7 +256,7 @@ export default function SettingsScreen() {
         <View style={styles.customSoundSection}>
           <Text style={styles.customSoundTitle}>Custom Sound</Text>
           <Text style={styles.customSoundDescription}>
-            Upload your own audio file
+            Upload your own audio file (MP3, WAV, etc.)
           </Text>
 
           <View style={styles.customSoundControls}>
@@ -230,38 +278,47 @@ export default function SettingsScreen() {
                 {customSoundName}
               </Text>
               <TouchableOpacity
-                style={styles.testButton}
-                onPress={testSound}>
-                <Volume2 size={20} color="#7C3AED" />
-                <Text style={styles.testButtonText}>Test</Text>
+                style={[styles.testButton, isTestingSound && styles.testButtonActive]}
+                onPress={() => isTestingSound ? stopTestSound() : testSound(customSound || undefined)}>
+                {isTestingSound ? (
+                  <Square size={20} color="#EF4444" />
+                ) : (
+                  <Volume2 size={20} color="#7C3AED" />
+                )}
+                <Text style={[styles.testButtonText, isTestingSound && styles.testButtonTextActive]}>
+                  {isTestingSound ? 'Stop' : 'Test'}
+                </Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
       </View>
 
-      {/* Background Image Section */}
+      {/* ADHD Tips Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Background Image</Text>
+        <Text style={styles.sectionTitle}>ADHD-Friendly Features</Text>
         <Text style={styles.sectionDescription}>
-          Choose a custom background for your home screen
+          This app is designed with ADHD in mind
         </Text>
-
-        {backgroundImage && (
-          <View style={styles.currentBackground}>
-            <Image source={{ uri: backgroundImage }} style={styles.backgroundPreview} />
-            <TouchableOpacity
-              style={styles.removeImageButton}
-              onPress={removeBackgroundImage}>
-              <Trash2 size={16} color="#EF4444" />
-            </TouchableOpacity>
+        
+        <View style={styles.featuresList}>
+          <View style={styles.featureItem}>
+            <Text style={styles.featureTitle}>• Flexible Durations</Text>
+            <Text style={styles.featureDescription}>From 30 seconds to 1 hour</Text>
           </View>
-        )}
-
-        <TouchableOpacity style={styles.backgroundButton} onPress={pickBackgroundImage}>
-          <ImageIcon size={20} color="#7C3AED" />
-          <Text style={styles.backgroundButtonText}>Choose Background</Text>
-        </TouchableOpacity>
+          <View style={styles.featureItem}>
+            <Text style={styles.featureTitle}>• Screen-Off Alerts</Text>
+            <Text style={styles.featureDescription}>Notifications work even when screen is off</Text>
+          </View>
+          <View style={styles.featureItem}>
+            <Text style={styles.featureTitle}>• Reward System</Text>
+            <Text style={styles.featureDescription}>Motivational activities after focus sessions</Text>
+          </View>
+          <View style={styles.featureItem}>
+            <Text style={styles.featureTitle}>• Personal Customization</Text>
+            <Text style={styles.featureDescription}>Your activities and backgrounds are private</Text>
+          </View>
+        </View>
       </View>
     </ScrollView>
   );
@@ -312,6 +369,46 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: 16,
   },
+  currentBackground: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  backgroundPreview: {
+    width: '100%',
+    height: 120,
+    borderRadius: 12,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  backgroundButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+  },
+  backgroundButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: '#7C3AED',
+  },
   soundOptions: {
     marginBottom: 20,
   },
@@ -338,10 +435,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     borderRadius: 8,
   },
+  testButtonActive: {
+    backgroundColor: '#FEF2F2',
+  },
   testButtonText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 14,
     color: '#7C3AED',
+  },
+  testButtonTextActive: {
+    color: '#EF4444',
   },
   customSoundSection: {
     borderTopWidth: 1,
@@ -409,44 +512,22 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
-  currentBackground: {
-    position: 'relative',
-    marginBottom: 16,
+  featuresList: {
+    gap: 12,
   },
-  backgroundPreview: {
-    width: '100%',
-    height: 120,
-    borderRadius: 12,
+  featureItem: {
+    paddingVertical: 8,
   },
-  removeImageButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    padding: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  backgroundButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderStyle: 'dashed',
-  },
-  backgroundButtonText: {
+  featureTitle: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
-    color: '#7C3AED',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  featureDescription: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#6B7280',
+    paddingLeft: 16,
   },
 });
