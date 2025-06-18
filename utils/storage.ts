@@ -5,6 +5,7 @@ const STORAGE_KEYS = {
   CUSTOM_SOUND: 'enfoque_custom_sound',
   BACKGROUND_IMAGE: 'enfoque_background_image',
   TIMER_STATE: 'enfoque_timer_state',
+  LANGUAGE: 'enfoque_language',
 };
 
 export const StorageService = {
@@ -76,6 +77,25 @@ export const StorageService = {
       await AsyncStorage.removeItem(STORAGE_KEYS.BACKGROUND_IMAGE);
     } catch (error) {
       console.error('Error removing background image:', error);
+    }
+  },
+
+  // Language
+  async getLanguage(): Promise<string> {
+    try {
+      const language = await AsyncStorage.getItem(STORAGE_KEYS.LANGUAGE);
+      return language || 'en';
+    } catch (error) {
+      console.error('Error getting language:', error);
+      return 'en';
+    }
+  },
+
+  async saveLanguage(language: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.LANGUAGE, language);
+    } catch (error) {
+      console.error('Error saving language:', error);
     }
   },
 

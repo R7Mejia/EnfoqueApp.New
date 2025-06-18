@@ -9,17 +9,26 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
-import { Upload, Volume2, Trash2, Image as ImageIcon, Square } from 'lucide-react-native';
+import { Upload, Volume2, Trash2, Image as ImageIcon, Square, Globe } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { StorageService } from '@/utils/storage';
 import { AudioService } from '@/utils/audio';
+import { getTranslation } from '@/utils/translations';
 
 export default function SettingsScreen() {
   const [customSound, setCustomSound] = useState<string | null>(null);
   const [customSoundName, setCustomSoundName] = useState<string | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [isTestingSound, setIsTestingSound] = useState(false);
+  const [currentLanguage, setCurrentLanguage] = useState('en');
+
+  const languages = [
+    { code: 'en', name: 'English' },
+    { code: 'es', name: 'Español' },
+    { code: 'fr', name: 'Français' },
+    { code: 'zh', name: '中文' },
+  ];
 
   useEffect(() => {
     loadSettings();
@@ -27,17 +36,19 @@ export default function SettingsScreen() {
 
   const loadSettings = async () => {
     try {
-      const [sound, image] = await Promise.all([
+      const [sound, image, language] = await Promise.all([
         StorageService.getCustomSound(),
         StorageService.getBackgroundImage(),
+        StorageService.getLanguage(),
       ]);
       
       setCustomSound(sound);
       setBackgroundImage(image);
+      setCurrentLanguage(language);
       
       if (sound) {
         // Extract filename from URI
-        const filename = sound.split('/').pop() || 'Custom Sound';
+        const filename = sound.split('/').pop() || getTranslation(language, 'customSound');
         setCustomSoundName(filename);
       }
     } catch (error) {
@@ -45,10 +56,27 @@ export default function SettingsScreen() {
     }
   };
 
+  const t = (key: string) => getTranslation(currentLanguage, key);
+
+  const changeLanguage = async (languageCode: string) => {
+    try {
+      await StorageService.saveLanguage(languageCode);
+      setCurrentLanguage(languageCode);
+      
+      if (Platform.OS === 'web') {
+        alert(`${getTranslation(languageCode, 'success')}\n\n${getTranslation(languageCode, 'languageChanged')}`);
+      } else {
+        Alert.alert(getTranslation(languageCode, 'success'), getTranslation(languageCode, 'languageChanged'));
+      }
+    } catch (error) {
+      console.error('Error changing language:', error);
+    }
+  };
+
   const pickSound = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: 'audio/*',
+        type: ['audio/*'],
         copyToCacheDirectory: true,
       });
 
@@ -59,17 +87,17 @@ export default function SettingsScreen() {
         setCustomSoundName(asset.name);
         
         if (Platform.OS === 'web') {
-          alert('Success!\n\nCustom sound uploaded successfully!');
+          alert(`${t('success')}\n\n${t('soundUploaded')}`);
         } else {
-          Alert.alert('Success', 'Custom sound uploaded successfully!');
+          Alert.alert(t('success'), t('soundUploaded'));
         }
       }
     } catch (error) {
       console.error('Error picking sound:', error);
       if (Platform.OS === 'web') {
-        alert('Error\n\nFailed to upload sound file. Please try again.');
+        alert(`${t('error')}\n\n${t('uploadError')}`);
       } else {
-        Alert.alert('Error', 'Failed to upload sound file. Please try again.');
+        Alert.alert(t('error'), t('uploadError'));
       }
     }
   };
@@ -82,17 +110,17 @@ export default function SettingsScreen() {
     };
 
     if (Platform.OS === 'web') {
-      if (confirm('Are you sure you want to remove your custom sound?')) {
+      if (confirm(t('removeSoundMessage'))) {
         confirmRemove();
       }
     } else {
       Alert.alert(
-        'Remove Custom Sound',
-        'Are you sure you want to remove your custom sound?',
+        t('removeSound'),
+        t('removeSoundMessage'),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('cancel'), style: 'cancel' },
           {
-            text: 'Remove',
+            text: t('remove'),
             style: 'destructive',
             onPress: confirmRemove,
           },
@@ -113,9 +141,9 @@ export default function SettingsScreen() {
       console.error('Error testing sound:', error);
       setIsTestingSound(false);
       if (Platform.OS === 'web') {
-        alert('Error\n\nFailed to play sound. Please check your audio file.');
+        alert(`${t('error')}\n\n${t('soundError')}`);
       } else {
-        Alert.alert('Error', 'Failed to play sound. Please check your audio file.');
+        Alert.alert(t('error'), t('soundError'));
       }
     }
   };
@@ -154,17 +182,17 @@ export default function SettingsScreen() {
         setBackgroundImage(asset.uri);
         
         if (Platform.OS === 'web') {
-          alert('Success!\n\nBackground image updated successfully! Go to the Home or Focus tab to see your new background.');
+          alert(`${t('success')}\n\n${t('backgroundUpdated')}`);
         } else {
-          Alert.alert('Success', 'Background image updated successfully! Go to the Home or Focus tab to see your new background.');
+          Alert.alert(t('success'), t('backgroundUpdated'));
         }
       }
     } catch (error) {
       console.error('Error picking image:', error);
       if (Platform.OS === 'web') {
-        alert('Error\n\nFailed to upload image. Please try again.');
+        alert(`${t('error')}\n\n${t('uploadError')}`);
       } else {
-        Alert.alert('Error', 'Failed to upload image. Please try again.');
+        Alert.alert(t('error'), t('uploadError'));
       }
     }
   };
@@ -176,17 +204,17 @@ export default function SettingsScreen() {
     };
 
     if (Platform.OS === 'web') {
-      if (confirm('Are you sure you want to remove your custom background?')) {
+      if (confirm(t('removeBackgroundMessage'))) {
         confirmRemove();
       }
     } else {
       Alert.alert(
-        'Remove Background Image',
-        'Are you sure you want to remove your custom background?',
+        t('removeBackground'),
+        t('removeBackgroundMessage'),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('cancel'), style: 'cancel' },
           {
-            text: 'Remove',
+            text: t('remove'),
             style: 'destructive',
             onPress: confirmRemove,
           },
@@ -198,15 +226,50 @@ export default function SettingsScreen() {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <Text style={styles.title}>Settings</Text>
-        <Text style={styles.subtitle}>Customize your experience</Text>
+        <Text style={styles.title}>{t('settingsTitle')}</Text>
+        <Text style={styles.subtitle}>{t('customizeExperience')}</Text>
+      </View>
+
+      {/* Language Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t('language')}</Text>
+        <Text style={styles.sectionDescription}>
+          {t('languageDesc')}
+        </Text>
+
+        <View style={styles.languageOptions}>
+          {languages.map((language) => (
+            <TouchableOpacity
+              key={language.code}
+              style={[
+                styles.languageOption,
+                currentLanguage === language.code && styles.selectedLanguageOption,
+              ]}
+              onPress={() => changeLanguage(language.code)}>
+              <Globe 
+                size={20} 
+                color={currentLanguage === language.code ? '#7C3AED' : '#6B7280'} 
+              />
+              <Text
+                style={[
+                  styles.languageOptionText,
+                  currentLanguage === language.code && styles.selectedLanguageText,
+                ]}>
+                {language.name}
+              </Text>
+              {currentLanguage === language.code && (
+                <View style={styles.selectedIndicator} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       {/* Background Image Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Background Image</Text>
+        <Text style={styles.sectionTitle}>{t('backgroundImage')}</Text>
         <Text style={styles.sectionDescription}>
-          Choose a custom background for your home and focus screens
+          {t('backgroundImageDesc')}
         </Text>
 
         {backgroundImage && (
@@ -223,21 +286,21 @@ export default function SettingsScreen() {
         <TouchableOpacity style={styles.backgroundButton} onPress={pickBackgroundImage}>
           <ImageIcon size={20} color="#7C3AED" />
           <Text style={styles.backgroundButtonText}>
-            {backgroundImage ? 'Change Background' : 'Choose Background'}
+            {backgroundImage ? t('changeBackground') : t('chooseBackground')}
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* Timer Sound Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Timer Sound</Text>
+        <Text style={styles.sectionTitle}>{t('timerSound')}</Text>
         <Text style={styles.sectionDescription}>
-          Choose your focus timer completion sound
+          {t('timerSoundDesc')}
         </Text>
 
         <View style={styles.soundOptions}>
           <View style={styles.soundOption}>
-            <Text style={styles.soundOptionLabel}>Default Bell</Text>
+            <Text style={styles.soundOptionLabel}>{t('defaultBell')}</Text>
             <TouchableOpacity
               style={[styles.testButton, isTestingSound && styles.testButtonActive]}
               onPress={() => isTestingSound ? stopTestSound() : testSound()}>
@@ -247,22 +310,22 @@ export default function SettingsScreen() {
                 <Volume2 size={20} color="#7C3AED" />
               )}
               <Text style={[styles.testButtonText, isTestingSound && styles.testButtonTextActive]}>
-                {isTestingSound ? 'Stop' : 'Test'}
+                {isTestingSound ? t('stop') : t('test')}
               </Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.customSoundSection}>
-          <Text style={styles.customSoundTitle}>Custom Sound</Text>
+          <Text style={styles.customSoundTitle}>{t('customSound')}</Text>
           <Text style={styles.customSoundDescription}>
-            Upload your own audio file (MP3, WAV, etc.)
+            {t('customSoundDesc')}
           </Text>
 
           <View style={styles.customSoundControls}>
             <TouchableOpacity style={styles.uploadButton} onPress={pickSound}>
               <Upload size={20} color="#7C3AED" />
-              <Text style={styles.uploadButtonText}>Upload Sound</Text>
+              <Text style={styles.uploadButtonText}>{t('uploadSound')}</Text>
             </TouchableOpacity>
 
             {customSound && (
@@ -286,7 +349,7 @@ export default function SettingsScreen() {
                   <Volume2 size={20} color="#7C3AED" />
                 )}
                 <Text style={[styles.testButtonText, isTestingSound && styles.testButtonTextActive]}>
-                  {isTestingSound ? 'Stop' : 'Test'}
+                  {isTestingSound ? t('stop') : t('test')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -296,27 +359,27 @@ export default function SettingsScreen() {
 
       {/* ADHD Tips Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>ADHD-Friendly Features</Text>
+        <Text style={styles.sectionTitle}>{t('adhdFeatures')}</Text>
         <Text style={styles.sectionDescription}>
-          This app is designed with ADHD in mind
+          {t('adhdFeaturesDesc')}
         </Text>
         
         <View style={styles.featuresList}>
           <View style={styles.featureItem}>
-            <Text style={styles.featureTitle}>• Flexible Durations</Text>
-            <Text style={styles.featureDescription}>From 30 seconds to 1 hour</Text>
+            <Text style={styles.featureTitle}>{t('flexibleDurations')}</Text>
+            <Text style={styles.featureDescription}>{t('flexibleDurationsDesc')}</Text>
           </View>
           <View style={styles.featureItem}>
-            <Text style={styles.featureTitle}>• Screen-Off Alerts</Text>
-            <Text style={styles.featureDescription}>Notifications work even when screen is off</Text>
+            <Text style={styles.featureTitle}>{t('screenOffAlerts')}</Text>
+            <Text style={styles.featureDescription}>{t('screenOffAlertsDesc')}</Text>
           </View>
           <View style={styles.featureItem}>
-            <Text style={styles.featureTitle}>• Reward System</Text>
-            <Text style={styles.featureDescription}>Motivational activities after focus sessions</Text>
+            <Text style={styles.featureTitle}>{t('rewardSystem')}</Text>
+            <Text style={styles.featureDescription}>{t('rewardSystemDesc')}</Text>
           </View>
           <View style={styles.featureItem}>
-            <Text style={styles.featureTitle}>• Personal Customization</Text>
-            <Text style={styles.featureDescription}>Your activities and backgrounds are private</Text>
+            <Text style={styles.featureTitle}>{t('personalCustomization')}</Text>
+            <Text style={styles.featureDescription}>{t('personalCustomizationDesc')}</Text>
           </View>
         </View>
       </View>
@@ -368,6 +431,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     marginBottom: 16,
+  },
+  languageOptions: {
+    gap: 12,
+  },
+  languageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedLanguageOption: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#7C3AED',
+  },
+  languageOptionText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: '#1F2937',
+    marginLeft: 12,
+    flex: 1,
+  },
+  selectedLanguageText: {
+    color: '#7C3AED',
+  },
+  selectedIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#7C3AED',
   },
   currentBackground: {
     position: 'relative',
