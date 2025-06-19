@@ -8,34 +8,47 @@ import {
   TextInput,
   Alert,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { X, Plus } from 'lucide-react-native';
+import { Activity, ActivityCategories } from '@/utils/storage';
 
 interface ActivityModalProps {
   visible: boolean;
   onClose: () => void;
-  onAdd: (activity: string) => void;
+  onAdd: (activity: Activity) => void;
 }
 
 export default function ActivityModal({ visible, onClose, onAdd }: ActivityModalProps) {
-  const [activity, setActivity] = useState('');
+  const [activityName, setActivityName] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('recreation');
 
   const handleAdd = () => {
-    if (activity.trim()) {
-      onAdd(activity.trim());
-      setActivity('');
+    if (activityName.trim()) {
+      const newActivity: Activity = {
+        id: `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: activityName.trim(),
+        category: selectedCategory,
+        emoji: ActivityCategories[selectedCategory as keyof typeof ActivityCategories].emoji,
+        createdAt: Date.now(),
+      };
+      
+      onAdd(newActivity);
+      setActivityName('');
+      setSelectedCategory('recreation');
       onClose();
     } else {
       if (Platform.OS === 'web') {
-        alert('Error\n\nPlease enter an activity');
+        alert('Error\n\nPlease enter an activity name');
       } else {
-        Alert.alert('Error', 'Please enter an activity');
+        Alert.alert('Error', 'Please enter an activity name');
       }
     }
   };
 
   const handleClose = () => {
-    setActivity('');
+    setActivityName('');
+    setSelectedCategory('recreation');
     onClose();
   };
 
@@ -56,22 +69,56 @@ export default function ActivityModal({ visible, onClose, onAdd }: ActivityModal
           </TouchableOpacity>
         </View>
 
-        <View style={styles.content}>
-          <Text style={styles.label}>Activity Name</Text>
-          <TextInput
-            style={styles.input}
-            value={activity}
-            onChangeText={setActivity}
-            placeholder="Enter a motivational activity..."
-            placeholderTextColor="#9CA3AF"
-            maxLength={50}
-            autoFocus
-            multiline={false}
-          />
-          <Text style={styles.hint}>
-            Add activities that motivate you or bring you joy during breaks
-          </Text>
-        </View>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.section}>
+            <Text style={styles.label}>Activity Name</Text>
+            <TextInput
+              style={styles.input}
+              value={activityName}
+              onChangeText={setActivityName}
+              placeholder="Enter a motivational activity..."
+              placeholderTextColor="#9CA3AF"
+              maxLength={50}
+              autoFocus
+              multiline={false}
+            />
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Category</Text>
+            <Text style={styles.categoryHint}>
+              Choose a category that best describes your activity
+            </Text>
+            
+            <View style={styles.categoriesGrid}>
+              {Object.entries(ActivityCategories).map(([key, category]) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[
+                    styles.categoryOption,
+                    selectedCategory === key && styles.selectedCategory,
+                  ]}
+                  onPress={() => setSelectedCategory(key)}>
+                  <Text style={styles.categoryEmoji}>{category.emoji}</Text>
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      selectedCategory === key && styles.selectedCategoryText,
+                    ]}>
+                    {category.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.hint}>
+              Add activities that motivate you or bring you joy during breaks. 
+              These will be randomly suggested when your focus sessions end.
+            </Text>
+          </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -104,7 +151,11 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   content: {
+    flex: 1,
     padding: 20,
+  },
+  section: {
+    marginBottom: 24,
   },
   label: {
     fontFamily: 'Inter-SemiBold',
@@ -122,13 +173,53 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    marginBottom: 12,
     minHeight: 48,
+  },
+  categoryHint: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+  },
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    minWidth: '45%',
+    gap: 8,
+  },
+  selectedCategory: {
+    borderColor: '#7C3AED',
+    backgroundColor: '#F3F4F6',
+  },
+  categoryEmoji: {
+    fontSize: 20,
+  },
+  categoryText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: '#1F2937',
+    flex: 1,
+  },
+  selectedCategoryText: {
+    color: '#7C3AED',
   },
   hint: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
     color: '#6B7280',
     lineHeight: 20,
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
 });

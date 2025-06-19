@@ -8,19 +8,57 @@ const STORAGE_KEYS = {
   LANGUAGE: 'enfoque_language',
 };
 
+export interface Activity {
+  id: string;
+  name: string;
+  category: string;
+  emoji: string;
+  createdAt: number;
+}
+
+export const ActivityCategories = {
+  recreation: { name: 'Recreation', emoji: '🎮' },
+  exercise: { name: 'Exercise', emoji: '💪' },
+  creative: { name: 'Creative', emoji: '🎨' },
+  social: { name: 'Social', emoji: '👥' },
+  relaxation: { name: 'Relaxation', emoji: '🧘' },
+  learning: { name: 'Learning', emoji: '📚' },
+  music: { name: 'Music', emoji: '🎵' },
+  outdoor: { name: 'Outdoor', emoji: '🌳' },
+  food: { name: 'Food & Drink', emoji: '🍕' },
+  other: { name: 'Other', emoji: '✨' },
+};
+
 export const StorageService = {
   // Activities
-  async getActivities(): Promise<string[]> {
+  async getActivities(): Promise<Activity[]> {
     try {
       const activities = await AsyncStorage.getItem(STORAGE_KEYS.ACTIVITIES);
-      return activities ? JSON.parse(activities) : [];
+      if (activities) {
+        const parsed = JSON.parse(activities);
+        // Handle legacy string array format
+        if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
+          // Convert old format to new format
+          const converted: Activity[] = parsed.map((name: string, index: number) => ({
+            id: `legacy_${index}_${Date.now()}`,
+            name,
+            category: 'other',
+            emoji: '✨',
+            createdAt: Date.now() - (parsed.length - index) * 1000,
+          }));
+          await this.saveActivities(converted);
+          return converted;
+        }
+        return parsed;
+      }
+      return [];
     } catch (error) {
       console.error('Error getting activities:', error);
       return [];
     }
   },
 
-  async saveActivities(activities: string[]): Promise<void> {
+  async saveActivities(activities: Activity[]): Promise<void> {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
     } catch (error) {

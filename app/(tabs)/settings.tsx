@@ -9,7 +9,7 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
-import { Upload, Volume2, Trash2, Image as ImageIcon, Square, Globe } from 'lucide-react-native';
+import { Upload, Volume2, Trash2, Image as ImageIcon, Square, Globe, Play, Pause } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { StorageService } from '@/utils/storage';
@@ -133,10 +133,6 @@ export default function SettingsScreen() {
     try {
       setIsTestingSound(true);
       await AudioService.testSound(soundUri);
-      // Auto-stop after 3 seconds for testing
-      setTimeout(() => {
-        setIsTestingSound(false);
-      }, 3000);
     } catch (error) {
       console.error('Error testing sound:', error);
       setIsTestingSound(false);
@@ -150,10 +146,11 @@ export default function SettingsScreen() {
 
   const stopTestSound = async () => {
     try {
-      await AudioService.cleanup();
+      await AudioService.stopTestSound();
       setIsTestingSound(false);
     } catch (error) {
       console.error('Error stopping sound:', error);
+      setIsTestingSound(false);
     }
   };
 
@@ -301,18 +298,20 @@ export default function SettingsScreen() {
         <View style={styles.soundOptions}>
           <View style={styles.soundOption}>
             <Text style={styles.soundOptionLabel}>{t('defaultBell')}</Text>
-            <TouchableOpacity
-              style={[styles.testButton, isTestingSound && styles.testButtonActive]}
-              onPress={() => isTestingSound ? stopTestSound() : testSound()}>
-              {isTestingSound ? (
-                <Square size={20} color="#EF4444" />
-              ) : (
-                <Volume2 size={20} color="#7C3AED" />
-              )}
-              <Text style={[styles.testButtonText, isTestingSound && styles.testButtonTextActive]}>
-                {isTestingSound ? t('stop') : t('test')}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.soundControls}>
+              <TouchableOpacity
+                style={[styles.testButton, isTestingSound && styles.testButtonActive]}
+                onPress={() => isTestingSound ? stopTestSound() : testSound()}>
+                {isTestingSound ? (
+                  <Pause size={20} color="#EF4444" />
+                ) : (
+                  <Play size={20} color="#7C3AED" />
+                )}
+                <Text style={[styles.testButtonText, isTestingSound && styles.testButtonTextActive]}>
+                  {isTestingSound ? t('stop') : t('test')}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -337,21 +336,25 @@ export default function SettingsScreen() {
 
           {customSoundName && (
             <View style={styles.currentSound}>
-              <Text style={styles.currentSoundText} numberOfLines={1}>
-                {customSoundName}
-              </Text>
-              <TouchableOpacity
-                style={[styles.testButton, isTestingSound && styles.testButtonActive]}
-                onPress={() => isTestingSound ? stopTestSound() : testSound(customSound || undefined)}>
-                {isTestingSound ? (
-                  <Square size={20} color="#EF4444" />
-                ) : (
-                  <Volume2 size={20} color="#7C3AED" />
-                )}
-                <Text style={[styles.testButtonText, isTestingSound && styles.testButtonTextActive]}>
-                  {isTestingSound ? t('stop') : t('test')}
+              <View style={styles.soundInfo}>
+                <Text style={styles.currentSoundText} numberOfLines={1}>
+                  {customSoundName}
                 </Text>
-              </TouchableOpacity>
+              </View>
+              <View style={styles.soundControls}>
+                <TouchableOpacity
+                  style={[styles.testButton, isTestingSound && styles.testButtonActive]}
+                  onPress={() => isTestingSound ? stopTestSound() : testSound(customSound || undefined)}>
+                  {isTestingSound ? (
+                    <Pause size={20} color="#EF4444" />
+                  ) : (
+                    <Play size={20} color="#7C3AED" />
+                  )}
+                  <Text style={[styles.testButtonText, isTestingSound && styles.testButtonTextActive]}>
+                    {isTestingSound ? t('stop') : t('test')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -521,6 +524,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
     color: '#1F2937',
+    flex: 1,
+  },
+  soundControls: {
+    flexDirection: 'row',
+    gap: 8,
   },
   testButton: {
     flexDirection: 'row',
@@ -601,12 +609,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#BBF7D0',
   },
-  currentSoundText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#166534',
+  soundInfo: {
     flex: 1,
     marginRight: 12,
+  },
+  currentSoundText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: '#166534',
   },
   featuresList: {
     gap: 12,

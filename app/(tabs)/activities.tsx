@@ -10,10 +10,10 @@ import {
 } from 'react-native';
 import { Plus, X, Trash2 } from 'lucide-react-native';
 import ActivityModal from '@/components/ActivityModal';
-import { StorageService } from '@/utils/storage';
+import { StorageService, Activity, ActivityCategories } from '@/utils/storage';
 
 export default function ActivitiesScreen() {
-  const [activities, setActivities] = useState<string[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function ActivitiesScreen() {
     setActivities(loadedActivities);
   };
 
-  const addActivity = async (activity: string) => {
+  const addActivity = async (activity: Activity) => {
     if (activities.length >= 20) {
       if (Platform.OS === 'web') {
         alert('Limit Reached\n\nYou can only have up to 20 activities.');
@@ -40,9 +40,9 @@ export default function ActivitiesScreen() {
     await StorageService.saveActivities(newActivities);
   };
 
-  const removeActivity = async (index: number) => {
+  const removeActivity = async (id: string) => {
     const confirmRemove = () => {
-      const newActivities = activities.filter((_, i) => i !== index);
+      const newActivities = activities.filter((activity) => activity.id !== id);
       setActivities(newActivities);
       StorageService.saveActivities(newActivities);
     };
@@ -93,11 +93,20 @@ export default function ActivitiesScreen() {
     }
   };
 
+  const groupedActivities = activities.reduce((groups, activity) => {
+    const category = activity.category || 'other';
+    if (!groups[category]) {
+      groups[category] = [];
+    }
+    groups[category].push(activity);
+    return groups;
+  }, {} as Record<string, Activity[]>);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Reward Activities</Text>
-        <Text style={styles.subtitle}>Manage your reward activities</Text>
+        <Text style={styles.subtitle}>Manage your reward activities by category</Text>
       </View>
 
       <TouchableOpacity
@@ -130,19 +139,33 @@ export default function ActivitiesScreen() {
             </Text>
           </View>
         ) : (
-          activities.map((activity, index) => (
-            <View key={index} style={styles.activityItem}>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityNumber}>{index + 1}</Text>
-                <Text style={styles.activityText}>{activity}</Text>
+          Object.entries(groupedActivities).map(([categoryKey, categoryActivities]) => {
+            const categoryInfo = ActivityCategories[categoryKey as keyof typeof ActivityCategories] || ActivityCategories.other;
+            
+            return (
+              <View key={categoryKey} style={styles.categorySection}>
+                <View style={styles.categoryHeader}>
+                  <Text style={styles.categoryEmoji}>{categoryInfo.emoji}</Text>
+                  <Text style={styles.categoryTitle}>{categoryInfo.name}</Text>
+                  <Text style={styles.categoryCount}>({categoryActivities.length})</Text>
+                </View>
+                
+                {categoryActivities.map((activity) => (
+                  <View key={activity.id} style={styles.activityItem}>
+                    <View style={styles.activityContent}>
+                      <Text style={styles.activityEmoji}>{activity.emoji}</Text>
+                      <Text style={styles.activityText}>{activity.name}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={() => removeActivity(activity.id)}>
+                      <X size={20} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
               </View>
-              <TouchableOpacity
-                style={styles.removeButton}
-                onPress={() => removeActivity(index)}>
-                <X size={20} color="#EF4444" />
-              </TouchableOpacity>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
 
@@ -249,6 +272,30 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
+  categorySection: {
+    marginBottom: 24,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  categoryEmoji: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  categoryTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 18,
+    color: '#1F2937',
+    flex: 1,
+  },
+  categoryCount: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: '#6B7280',
+  },
   activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -268,16 +315,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  activityNumber: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 16,
-    color: '#7C3AED',
-    backgroundColor: '#F3F4F6',
+  activityEmoji: {
+    fontSize: 24,
     width: 32,
-    height: 32,
-    borderRadius: 16,
     textAlign: 'center',
-    lineHeight: 32,
   },
   activityText: {
     flex: 1,

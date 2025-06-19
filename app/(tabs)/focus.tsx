@@ -15,7 +15,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import TimerDisplay from '@/components/TimerDisplay';
 import DurationSelector from '@/components/DurationSelector';
 import BreakModal from '@/components/BreakModal';
-import { StorageService } from '@/utils/storage';
+import { StorageService, Activity } from '@/utils/storage';
 import { AudioService } from '@/utils/audio';
 
 const { width } = Dimensions.get('window');
@@ -25,9 +25,9 @@ export default function FocusScreen() {
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [selectedDuration, setSelectedDuration] = useState(25);
-  const [activities, setActivities] = useState<string[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [showBreakModal, setShowBreakModal] = useState(false);
-  const [currentActivity, setCurrentActivity] = useState('');
+  const [currentActivity, setCurrentActivity] = useState<Activity | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [customSound, setCustomSound] = useState<string | null>(null);
   
@@ -166,7 +166,7 @@ export default function FocusScreen() {
       let newActivity;
       do {
         newActivity = activities[Math.floor(Math.random() * activities.length)];
-      } while (newActivity === currentActivity && activities.length > 1);
+      } while (newActivity.id === currentActivity?.id && activities.length > 1);
       setCurrentActivity(newActivity);
     }
   };

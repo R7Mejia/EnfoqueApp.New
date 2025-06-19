@@ -8,10 +8,11 @@ import {
   Image,
 } from 'react-native';
 import { X, RefreshCw } from 'lucide-react-native';
+import { Activity } from '@/utils/storage';
 
 interface BreakModalProps {
   visible: boolean;
-  activity: string;
+  activity: Activity | null;
   onClose: () => void;
   onNewActivity: () => void;
 }
@@ -45,9 +46,13 @@ export default function BreakModal({
           
           <Text style={styles.subtitle}>Time for a reward activity</Text>
           
-          <View style={styles.activityCard}>
-            <Text style={styles.activityText}>{activity}</Text>
-          </View>
+          {activity && (
+            <View style={styles.activityCard}>
+              <Text style={styles.activityEmoji}>{activity.emoji}</Text>
+              <Text style={styles.activityText}>{activity.name}</Text>
+              <Text style={styles.activityCategory}>{activity.category}</Text>
+            </View>
+          )}
 
           <TouchableOpacity style={styles.refreshButton} onPress={onNewActivity}>
             <RefreshCw size={20} color="#7C3AED" />
@@ -122,12 +127,23 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  activityEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
   activityText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    fontSize: 20,
     color: '#1F2937',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 28,
+    marginBottom: 8,
+  },
+  activityCategory: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#6B7280',
+    textTransform: 'capitalize',
   },
   refreshButton: {
     flexDirection: 'row',
