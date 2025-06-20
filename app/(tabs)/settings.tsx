@@ -9,19 +9,20 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
-import { Upload, Volume2, Trash2, Image as ImageIcon, Square, Globe, Play, Pause } from 'lucide-react-native';
+import { Upload, Volume2, Trash2, Image as ImageIcon, Square, Globe, Play, Pause, ChevronDown } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { StorageService } from '@/utils/storage';
-import { AudioService } from '@/utils/audio';
+import { AudioService, SoundOption, DEFAULT_SOUNDS } from '@/utils/audio';
 import { getTranslation } from '@/utils/translations';
 
 export default function SettingsScreen() {
-  const [customSound, setCustomSound] = useState<string | null>(null);
-  const [customSoundName, setCustomSoundName] = useState<string | null>(null);
+  const [customSounds, setCustomSounds] = useState<SoundOption[]>([]);
+  const [selectedSound, setSelectedSound] = useState<SoundOption | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [isTestingSound, setIsTestingSound] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('en');
+  const [showSoundDropdown, setShowSoundDropdown] = useState(false);
 
   const languages = [
     { code: 'en', name: 'English' },
@@ -36,21 +37,17 @@ export default function SettingsScreen() {
 
   const loadSettings = async () => {
     try {
-      const [sound, image, language] = await Promise.all([
-        StorageService.getCustomSound(),
+      const [sounds, selected, image, language] = await Promise.all([
+        StorageService.getCustomSounds(),
+        StorageService.getSelectedSound(),
         StorageService.getBackgroundImage(),
         StorageService.getLanguage(),
       ]);
       
-      setCustomSound(sound);
+      setCustomSounds(sounds);
+      setSelectedSound(selected || DEFAULT_SOUNDS[0]);
       setBackgroundImage(image);
       setCurrentLanguage(language);
-      
-      if (sound) {
-        // Extract filename from URI
-        const filename = sound.split('/').pop() || getTranslation(language, 'customSound');
-        setCustomSoundName(filename);
-      }
     } catch (error) {
       console.error('Error loading settings:', error);
     }
@@ -82,9 +79,15 @@ export default function SettingsScreen() {
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        await StorageService.saveCustomSound(asset.uri);
-        setCustomSound(asset.uri);
-        setCustomSoundName(asset.name);
+        const newSound: SoundOption = {
+          id: `custom_${Date.now()}`,
+          name: asset.name,
+          uri: asset.uri,
+          isDefault: false,
+        };
+        
+        await StorageService.addCustomSound(newSound);
+        setCustomSounds(prev => [...prev, newSound]);
         
         if (Platform.OS === 'web') {
           alert(`${t('success')}\n\n${t('soundUploaded')}`);
@@ -102,11 +105,17 @@ export default function SettingsScreen() {
     }
   };
 
-  const removeSound = async () => {
+  const removeCustomSound = async (soundId: string) => {
     const confirmRemove = async () => {
-      await StorageService.removeCustomSound();
-      setCustomSound(null);
-      setCustomSoundName(null);
+      await StorageService.removeCustomSound(soundId);
+      setCustomSounds(prev => prev.filter(sound => sound.id !== soundId));
+      
+      // If the removed sound was selected, reset to default
+      if (selectedSound?.id === soundId) {
+        const defaultSound = DEFAULT_SOUNDS[0];
+        setSelectedSound(defaultSound);
+        await StorageService.saveSelectedSound(defaultSound);
+      }
     };
 
     if (Platform.OS === 'web') {
@@ -129,10 +138,16 @@ export default function SettingsScreen() {
     }
   };
 
-  const testSound = async (soundUri?: string) => {
+  const selectSound = async (sound: SoundOption) => {
+    setSelectedSound(sound);
+    await StorageService.saveSelectedSound(sound);
+    setShowSoundDropdown(false);
+  };
+
+  const testSound = async (sound: SoundOption) => {
     try {
       setIsTestingSound(true);
-      await AudioService.testSound(soundUri);
+      await AudioService.testSound(sound);
     } catch (error) {
       console.error('Error testing sound:', error);
       setIsTestingSound(false);
@@ -156,7 +171,6 @@ export default function SettingsScreen() {
 
   const pickBackgroundImage = async () => {
     try {
-      // Request permission for mobile
       if (Platform.OS !== 'web') {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
         
@@ -219,6 +233,8 @@ export default function SettingsScreen() {
       );
     }
   };
+
+  const allSounds = [...DEFAULT_SOUNDS, ...customSounds];
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -295,68 +311,76 @@ export default function SettingsScreen() {
           {t('timerSoundDesc')}
         </Text>
 
-        <View style={styles.soundOptions}>
-          <View style={styles.soundOption}>
-            <Text style={styles.soundOptionLabel}>{t('defaultBell')}</Text>
-            <View style={styles.soundControls}>
-              <TouchableOpacity
-                style={[styles.testButton, isTestingSound && styles.testButtonActive]}
-                onPress={() => isTestingSound ? stopTestSound() : testSound()}>
-                {isTestingSound ? (
-                  <Pause size={20} color="#EF4444" />
-                ) : (
-                  <Play size={20} color="#7C3AED" />
-                )}
-                <Text style={[styles.testButtonText, isTestingSound && styles.testButtonTextActive]}>
-                  {isTestingSound ? t('stop') : t('test')}
-                </Text>
-              </TouchableOpacity>
+        {/* Sound Selector Dropdown */}
+        <View style={styles.soundSelector}>
+          <TouchableOpacity
+            style={styles.soundDropdownButton}
+            onPress={() => setShowSoundDropdown(!showSoundDropdown)}>
+            <Volume2 size={20} color="#7C3AED" />
+            <Text style={styles.soundDropdownText}>
+              {selectedSound?.name || 'Select Sound'}
+            </Text>
+            <ChevronDown size={20} color="#6B7280" />
+          </TouchableOpacity>
+
+          {showSoundDropdown && (
+            <View style={styles.soundDropdown}>
+              {allSounds.map((sound) => (
+                <View key={sound.id} style={styles.soundOption}>
+                  <TouchableOpacity
+                    style={[
+                      styles.soundOptionButton,
+                      selectedSound?.id === sound.id && styles.selectedSoundOption,
+                    ]}
+                    onPress={() => selectSound(sound)}>
+                    <Text
+                      style={[
+                        styles.soundOptionText,
+                        selectedSound?.id === sound.id && styles.selectedSoundText,
+                      ]}>
+                      {sound.name}
+                    </Text>
+                    {selectedSound?.id === sound.id && (
+                      <View style={styles.selectedIndicator} />
+                    )}
+                  </TouchableOpacity>
+                  
+                  <View style={styles.soundControls}>
+                    <TouchableOpacity
+                      style={[styles.testButton, isTestingSound && styles.testButtonActive]}
+                      onPress={() => isTestingSound ? stopTestSound() : testSound(sound)}>
+                      {isTestingSound ? (
+                        <Pause size={16} color="#EF4444" />
+                      ) : (
+                        <Play size={16} color="#7C3AED" />
+                      )}
+                    </TouchableOpacity>
+                    
+                    {!sound.isDefault && (
+                      <TouchableOpacity
+                        style={styles.removeButton}
+                        onPress={() => removeCustomSound(sound.id)}>
+                        <Trash2 size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              ))}
             </View>
-          </View>
+          )}
         </View>
 
+        {/* Add Custom Sound */}
         <View style={styles.customSoundSection}>
           <Text style={styles.customSoundTitle}>{t('customSound')}</Text>
           <Text style={styles.customSoundDescription}>
             {t('customSoundDesc')}
           </Text>
 
-          <View style={styles.customSoundControls}>
-            <TouchableOpacity style={styles.uploadButton} onPress={pickSound}>
-              <Upload size={20} color="#7C3AED" />
-              <Text style={styles.uploadButtonText}>{t('uploadSound')}</Text>
-            </TouchableOpacity>
-
-            {customSound && (
-              <TouchableOpacity style={styles.removeButton} onPress={removeSound}>
-                <Trash2 size={20} color="#EF4444" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {customSoundName && (
-            <View style={styles.currentSound}>
-              <View style={styles.soundInfo}>
-                <Text style={styles.currentSoundText} numberOfLines={1}>
-                  {customSoundName}
-                </Text>
-              </View>
-              <View style={styles.soundControls}>
-                <TouchableOpacity
-                  style={[styles.testButton, isTestingSound && styles.testButtonActive]}
-                  onPress={() => isTestingSound ? stopTestSound() : testSound(customSound || undefined)}>
-                  {isTestingSound ? (
-                    <Pause size={20} color="#EF4444" />
-                  ) : (
-                    <Play size={20} color="#7C3AED" />
-                  )}
-                  <Text style={[styles.testButtonText, isTestingSound && styles.testButtonTextActive]}>
-                    {isTestingSound ? t('stop') : t('test')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
+          <TouchableOpacity style={styles.uploadButton} onPress={pickSound}>
+            <Upload size={20} color="#7C3AED" />
+            <Text style={styles.uploadButtonText}>{t('uploadSound')}</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -508,47 +532,82 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#7C3AED',
   },
-  soundOptions: {
+  soundSelector: {
     marginBottom: 20,
   },
-  soundOption: {
+  soundDropdownButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 16,
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 12,
   },
-  soundOptionLabel: {
+  soundDropdownText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
     color: '#1F2937',
     flex: 1,
+  },
+  soundDropdown: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginTop: 8,
+    maxHeight: 300,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  soundOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  soundOptionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  selectedSoundOption: {
+    backgroundColor: '#F8FAFC',
+  },
+  soundOptionText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    color: '#1F2937',
+    flex: 1,
+  },
+  selectedSoundText: {
+    color: '#7C3AED',
+    fontFamily: 'Inter-SemiBold',
   },
   soundControls: {
     flexDirection: 'row',
     gap: 8,
   },
   testButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    padding: 8,
     backgroundColor: '#F3F4F6',
     borderRadius: 8,
   },
   testButtonActive: {
     backgroundColor: '#FEF2F2',
   },
-  testButtonText: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
-    color: '#7C3AED',
-  },
-  testButtonTextActive: {
-    color: '#EF4444',
+  removeButton: {
+    padding: 8,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 8,
   },
   customSoundSection: {
     borderTopWidth: 1,
@@ -567,13 +626,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: 16,
   },
-  customSoundControls: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
   uploadButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -590,33 +643,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
     color: '#7C3AED',
-  },
-  removeButton: {
-    padding: 12,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  currentSound: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#F0FDF4',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-  },
-  soundInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  currentSoundText: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
-    color: '#166534',
   },
   featuresList: {
     gap: 12,

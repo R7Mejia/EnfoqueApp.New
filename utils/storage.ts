@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SoundOption } from './audio';
 
 const STORAGE_KEYS = {
   ACTIVITIES: 'enfoque_activities',
-  CUSTOM_SOUND: 'enfoque_custom_sound',
+  CUSTOM_SOUNDS: 'enfoque_custom_sounds',
+  SELECTED_SOUND: 'enfoque_selected_sound',
   BACKGROUND_IMAGE: 'enfoque_background_image',
   TIMER_STATE: 'enfoque_timer_state',
   LANGUAGE: 'enfoque_language',
@@ -36,9 +38,7 @@ export const StorageService = {
       const activities = await AsyncStorage.getItem(STORAGE_KEYS.ACTIVITIES);
       if (activities) {
         const parsed = JSON.parse(activities);
-        // Handle legacy string array format
         if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
-          // Convert old format to new format
           const converted: Activity[] = parsed.map((name: string, index: number) => ({
             id: `legacy_${index}_${Date.now()}`,
             name,
@@ -66,29 +66,87 @@ export const StorageService = {
     }
   },
 
-  // Custom Sound
+  // Custom Sounds
+  async getCustomSounds(): Promise<SoundOption[]> {
+    try {
+      const sounds = await AsyncStorage.getItem(STORAGE_KEYS.CUSTOM_SOUNDS);
+      return sounds ? JSON.parse(sounds) : [];
+    } catch (error) {
+      console.error('Error getting custom sounds:', error);
+      return [];
+    }
+  },
+
+  async saveCustomSounds(sounds: SoundOption[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.CUSTOM_SOUNDS, JSON.stringify(sounds));
+    } catch (error) {
+      console.error('Error saving custom sounds:', error);
+    }
+  },
+
+  async addCustomSound(sound: SoundOption): Promise<void> {
+    try {
+      const existingSounds = await this.getCustomSounds();
+      const updatedSounds = [...existingSounds, sound];
+      await this.saveCustomSounds(updatedSounds);
+    } catch (error) {
+      console.error('Error adding custom sound:', error);
+    }
+  },
+
+  async removeCustomSound(soundId: string): Promise<void> {
+    try {
+      const existingSounds = await this.getCustomSounds();
+      const updatedSounds = existingSounds.filter(sound => sound.id !== soundId);
+      await this.saveCustomSounds(updatedSounds);
+    } catch (error) {
+      console.error('Error removing custom sound:', error);
+    }
+  },
+
+  // Selected Sound
+  async getSelectedSound(): Promise<SoundOption | null> {
+    try {
+      const sound = await AsyncStorage.getItem(STORAGE_KEYS.SELECTED_SOUND);
+      return sound ? JSON.parse(sound) : null;
+    } catch (error) {
+      console.error('Error getting selected sound:', error);
+      return null;
+    }
+  },
+
+  async saveSelectedSound(sound: SoundOption): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.SELECTED_SOUND, JSON.stringify(sound));
+    } catch (error) {
+      console.error('Error saving selected sound:', error);
+    }
+  },
+
+  // Legacy support
   async getCustomSound(): Promise<string | null> {
     try {
-      return await AsyncStorage.getItem(STORAGE_KEYS.CUSTOM_SOUND);
+      return await AsyncStorage.getItem('enfoque_custom_sound');
     } catch (error) {
-      console.error('Error getting custom sound:', error);
+      console.error('Error getting legacy custom sound:', error);
       return null;
     }
   },
 
   async saveCustomSound(soundUri: string): Promise<void> {
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.CUSTOM_SOUND, soundUri);
+      await AsyncStorage.setItem('enfoque_custom_sound', soundUri);
     } catch (error) {
-      console.error('Error saving custom sound:', error);
+      console.error('Error saving legacy custom sound:', error);
     }
   },
 
   async removeCustomSound(): Promise<void> {
     try {
-      await AsyncStorage.removeItem(STORAGE_KEYS.CUSTOM_SOUND);
+      await AsyncStorage.removeItem('enfoque_custom_sound');
     } catch (error) {
-      console.error('Error removing custom sound:', error);
+      console.error('Error removing legacy custom sound:', error);
     }
   },
 

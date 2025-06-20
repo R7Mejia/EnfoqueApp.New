@@ -9,16 +9,37 @@ import {
   Platform,
   Alert,
   Dimensions,
+  AppState,
 } from 'react-native';
 import { Play, Pause, RefreshCw } from 'lucide-react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import * as BackgroundFetch from 'expo-background-fetch';
+import * as TaskManager from 'expo-task-manager';
 import TimerDisplay from '@/components/TimerDisplay';
 import DurationSelector from '@/components/DurationSelector';
 import BreakModal from '@/components/BreakModal';
 import { StorageService, Activity } from '@/utils/storage';
-import { AudioService } from '@/utils/audio';
+import { AudioService, SoundOption } from '@/utils/audio';
 
 const { width } = Dimensions.get('window');
+
+// Background task for timer
+const BACKGROUND_TIMER_TASK = 'background-timer-task';
+
+TaskManager.defineTask(BACKGROUND_TIMER_TASK, async ({ data, error }) => {
+  if (error) {
+    console.error('Background timer task error:', error);
+    return;
+  }
+
+  try {
+    // This task will keep the timer running in background
+    return BackgroundFetch.BackgroundFetchResult.NewData;
+  } catch (error) {
+    console.error('Background timer task execution error:', error);
+    return BackgroundFetch.BackgroundFetchResult.Failed;
+  }
+});
 
 export default function FocusScreen() {
   const [task, setTask] = useState('');
@@ -29,11 +50,12 @@ export default function FocusScreen() {
   const [showBreakModal, setShowBreakModal] = useState(false);
   const [currentActivity, setCurrentActivity] = useState<Activity | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
-  const [customSound, setCustomSound] = useState<string | null>(null);
+  const [selectedSound, setSelectedSound] = useState<SoundOption | null>(null);
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const appState = useRef(AppState.currentState);
+  const backgroundStartTime = useRef<number | null>(null);
   
-  // Extended duration options from 30 seconds to 60 minutes
   const durations = [
     { label: '30s', value: 0.5 },
     { label: '1m', value: 1 },
@@ -48,6 +70,19 @@ export default function FocusScreen() {
 
   useEffect(() => {
     loadData();
+    
+    // Register background task
+    if (Platform.OS !== 'web') {
+      BackgroundFetch.registerTaskAsync(BACKGROUND_TIMER_TASK, {
+        minimumInterval: 1000, // 1 second
+        stopOnTerminate: false,
+        startOnBoot: true,
+      }).catch(console.error);
+    }
+
+    // Handle app state changes
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -55,14 +90,38 @@ export default function FocusScreen() {
       if (Platform.OS !== 'web') {
         deactivateKeepAwake();
       }
+      subscription?.remove();
     };
   }, []);
+
+  const handleAppStateChange = (nextAppState: string) => {
+    if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+      // App has come to the foreground
+      if (isRunning && backgroundStartTime.current) {
+        const timeInBackground = Math.floor((Date.now() - backgroundStartTime.current) / 1000);
+        setTimeLeft(prevTime => {
+          const newTime = Math.max(0, prevTime - timeInBackground);
+          if (newTime <= 0) {
+            handleTimerComplete();
+          }
+          return newTime;
+        });
+      }
+      backgroundStartTime.current = null;
+    } else if (nextAppState.match(/inactive|background/) && isRunning) {
+      // App is going to background
+      backgroundStartTime.current = Date.now();
+    }
+    
+    appState.current = nextAppState;
+  };
 
   useEffect(() => {
     if (isRunning && timeLeft > 0) {
       if (Platform.OS !== 'web') {
         activateKeepAwakeAsync();
       }
+      
       intervalRef.current = setInterval(() => {
         setTimeLeft((prevTime) => {
           const newTime = prevTime - 1;
@@ -95,12 +154,12 @@ export default function FocusScreen() {
       const [loadedActivities, loadedBackground, loadedSound] = await Promise.all([
         StorageService.getActivities(),
         StorageService.getBackgroundImage(),
-        StorageService.getCustomSound(),
+        StorageService.getSelectedSound(),
       ]);
       
       setActivities(loadedActivities);
       setBackgroundImage(loadedBackground);
-      setCustomSound(loadedSound);
+      setSelectedSound(loadedSound);
     } catch (error) {
       console.error('Error loading data:', error);
     }
@@ -108,12 +167,14 @@ export default function FocusScreen() {
 
   const handleTimerComplete = async () => {
     setIsRunning(false);
+    backgroundStartTime.current = null;
+    
     if (Platform.OS !== 'web') {
       deactivateKeepAwake();
     }
     
     // Play completion sound
-    await AudioService.playSound(customSound || undefined);
+    await AudioService.playSound(selectedSound || undefined);
     
     // Show break activity if available
     if (activities.length > 0) {
@@ -142,12 +203,19 @@ export default function FocusScreen() {
       }
       return;
     }
+    
+    if (!isRunning) {
+      backgroundStartTime.current = null;
+    }
+    
     setIsRunning(!isRunning);
   };
 
   const resetTimer = () => {
     setIsRunning(false);
     setTimeLeft(selectedDuration * 60);
+    backgroundStartTime.current = null;
+    
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;

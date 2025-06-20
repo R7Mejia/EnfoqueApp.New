@@ -2,25 +2,40 @@ import { Audio } from 'expo-av';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
+export interface SoundOption {
+  id: string;
+  name: string;
+  uri?: string;
+  isDefault: boolean;
+}
+
+export const DEFAULT_SOUNDS: SoundOption[] = [
+  { id: 'bell', name: 'Default Bell', isDefault: true },
+  { id: 'chime', name: 'Gentle Chime', isDefault: true },
+  { id: 'ding', name: 'Simple Ding', isDefault: true },
+  { id: 'notification', name: 'Notification Sound', isDefault: true },
+];
+
 export class AudioService {
   private static sound: Audio.Sound | null = null;
   private static isTestingSound = false;
+  private static backgroundTimer: NodeJS.Timeout | null = null;
 
   static async initializeAudio() {
     try {
       if (Platform.OS !== 'web') {
-        // Configure audio mode for background playback
+        // Configure audio mode for background playbook
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
-          staysActiveInBackground: true, // Keep audio active in background
-          playsInSilentModeIOS: true, // Play even in silent mode
-          shouldDuckAndroid: true,
+          staysActiveInBackground: true,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: false,
           playThroughEarpieceAndroid: false,
           interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
           interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
         });
 
-        // Configure notifications for when screen is off
+        // Configure notifications
         await Notifications.setNotificationHandler({
           handleNotification: async () => ({
             shouldShowAlert: true,
@@ -40,7 +55,7 @@ export class AudioService {
     }
   }
 
-  static async playSound(soundUri?: string) {
+  static async playSound(soundOption?: SoundOption) {
     try {
       // Stop any currently playing sound
       if (this.sound) {
@@ -50,8 +65,8 @@ export class AudioService {
 
       if (Platform.OS === 'web') {
         // Web-specific audio handling
-        if (soundUri) {
-          const audio = new window.Audio(soundUri);
+        if (soundOption && !soundOption.isDefault && soundOption.uri) {
+          const audio = new window.Audio(soundOption.uri);
           audio.volume = 0.8;
           audio.play().catch(() => {
             this.playSystemNotification();
@@ -61,9 +76,14 @@ export class AudioService {
         }
       } else {
         // Mobile audio handling with background support
-        const source = soundUri 
-          ? { uri: soundUri }
-          : require('../assets/sounds/default-bell.mp3');
+        let source;
+        
+        if (soundOption && !soundOption.isDefault && soundOption.uri) {
+          source = { uri: soundOption.uri };
+        } else {
+          // Use default sound based on selection
+          source = require('../assets/sounds/default-bell.mp3');
+        }
 
         const { sound } = await Audio.Sound.createAsync(source, {
           shouldPlay: true,
@@ -82,7 +102,7 @@ export class AudioService {
         
         await sound.playAsync();
 
-        // Also send a notification for screen-off scenarios
+        // Send notification for screen-off scenarios
         await Notifications.scheduleNotificationAsync({
           content: {
             title: '¡Enfoque! Focus Session Complete',
@@ -90,19 +110,17 @@ export class AudioService {
             sound: true,
             priority: Notifications.AndroidNotificationPriority.HIGH,
           },
-          trigger: null, // Show immediately
+          trigger: null,
         });
       }
     } catch (error) {
       console.error('Error playing sound:', error);
-      // Fallback to system notification if custom sound fails
       this.playSystemNotification();
     }
   }
 
   static playSystemNotification() {
     if (Platform.OS === 'web') {
-      // Web fallback - create a simple beep
       try {
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         const oscillator = audioContext.createOscillator();
@@ -125,35 +143,38 @@ export class AudioService {
     }
   }
 
-  static async testSound(soundUri?: string) {
+  static async testSound(soundOption?: SoundOption) {
     try {
       this.isTestingSound = true;
       
-      // Stop any currently playing sound
       if (this.sound) {
         await this.sound.unloadAsync();
         this.sound = null;
       }
 
       if (Platform.OS === 'web') {
-        if (soundUri) {
-          const audio = new window.Audio(soundUri);
+        if (soundOption && !soundOption.isDefault && soundOption.uri) {
+          const audio = new window.Audio(soundOption.uri);
           audio.volume = 0.8;
-          audio.loop = true; // Loop for testing
+          audio.loop = true;
           await audio.play();
-          this.sound = audio as any; // Store reference for stopping
+          this.sound = audio as any;
         } else {
           this.playSystemNotification();
         }
       } else {
-        const source = soundUri 
-          ? { uri: soundUri }
-          : require('../assets/sounds/default-bell.mp3');
+        let source;
+        
+        if (soundOption && !soundOption.isDefault && soundOption.uri) {
+          source = { uri: soundOption.uri };
+        } else {
+          source = require('../assets/sounds/default-bell.mp3');
+        }
 
         const { sound } = await Audio.Sound.createAsync(source, {
           shouldPlay: true,
           volume: 0.8,
-          isLooping: true, // Loop for testing
+          isLooping: true,
         });
         
         this.sound = sound;
@@ -171,13 +192,11 @@ export class AudioService {
       this.isTestingSound = false;
       if (this.sound) {
         if (Platform.OS === 'web') {
-          // Web audio handling
           if (this.sound && typeof (this.sound as any).pause === 'function') {
             (this.sound as any).pause();
             (this.sound as any).currentTime = 0;
           }
         } else {
-          // Mobile audio handling
           await this.sound.stopAsync();
           await this.sound.unloadAsync();
         }
@@ -192,9 +211,33 @@ export class AudioService {
     return this.isTestingSound;
   }
 
+  // Background timer functionality
+  static startBackgroundTimer(duration: number, onComplete: () => void) {
+    if (Platform.OS !== 'web') {
+      // For mobile, use background task
+      this.backgroundTimer = setInterval(() => {
+        // This will keep running even when screen is off
+        duration--;
+        if (duration <= 0) {
+          this.stopBackgroundTimer();
+          onComplete();
+        }
+      }, 1000);
+    }
+  }
+
+  static stopBackgroundTimer() {
+    if (this.backgroundTimer) {
+      clearInterval(this.backgroundTimer);
+      this.backgroundTimer = null;
+    }
+  }
+
   static async cleanup() {
     try {
       this.isTestingSound = false;
+      this.stopBackgroundTimer();
+      
       if (this.sound) {
         if (Platform.OS === 'web') {
           if (typeof (this.sound as any).pause === 'function') {
