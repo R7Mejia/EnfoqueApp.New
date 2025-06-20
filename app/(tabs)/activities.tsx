@@ -8,21 +8,32 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { Plus, X, Trash2 } from 'lucide-react-native';
+import { Plus, X, Trash2, Settings } from 'lucide-react-native';
 import ActivityModal from '@/components/ActivityModal';
-import { StorageService, Activity, ActivityCategories } from '@/utils/storage';
+import CategoryModal from '@/components/CategoryModal';
+import { StorageService, Activity, CustomCategory } from '@/utils/storage';
 
 export default function ActivitiesScreen() {
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [showModal, setShowModal] = useState(false);
+  const [categories, setCategories] = useState<CustomCategory[]>([]);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   useEffect(() => {
-    loadActivities();
+    loadData();
   }, []);
 
-  const loadActivities = async () => {
-    const loadedActivities = await StorageService.getActivities();
-    setActivities(loadedActivities);
+  const loadData = async () => {
+    try {
+      const [loadedActivities, loadedCategories] = await Promise.all([
+        StorageService.getActivities(),
+        StorageService.getAllCategories(),
+      ]);
+      setActivities(loadedActivities);
+      setCategories(loadedCategories);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
   };
 
   const addActivity = async (activity: Activity) => {
@@ -40,6 +51,12 @@ export default function ActivitiesScreen() {
     await StorageService.saveActivities(newActivities);
   };
 
+  const addCategory = async (category: CustomCategory) => {
+    await StorageService.addCustomCategory(category);
+    const updatedCategories = await StorageService.getAllCategories();
+    setCategories(updatedCategories);
+  };
+
   const removeActivity = async (id: string) => {
     const confirmRemove = () => {
       const newActivities = activities.filter((activity) => activity.id !== id);
@@ -55,6 +72,45 @@ export default function ActivitiesScreen() {
       Alert.alert(
         'Remove Activity',
         'Are you sure you want to remove this activity?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: confirmRemove,
+          },
+        ]
+      );
+    }
+  };
+
+  const removeCategory = async (categoryId: string) => {
+    // Check if category is being used by any activities
+    const isUsed = activities.some(activity => activity.category === categoryId);
+    
+    if (isUsed) {
+      if (Platform.OS === 'web') {
+        alert('Cannot Remove Category\n\nThis category is being used by one or more activities. Please remove or reassign those activities first.');
+      } else {
+        Alert.alert('Cannot Remove Category', 'This category is being used by one or more activities. Please remove or reassign those activities first.');
+      }
+      return;
+    }
+
+    const confirmRemove = async () => {
+      await StorageService.removeCustomCategory(categoryId);
+      const updatedCategories = await StorageService.getAllCategories();
+      setCategories(updatedCategories);
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm('Are you sure you want to remove this category?')) {
+        confirmRemove();
+      }
+    } else {
+      Alert.alert(
+        'Remove Category',
+        'Are you sure you want to remove this category?',
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -102,20 +158,34 @@ export default function ActivitiesScreen() {
     return groups;
   }, {} as Record<string, Activity[]>);
 
+  const getCategoryInfo = (categoryId: string) => {
+    return categories.find(cat => cat.id === categoryId) || 
+           { id: categoryId, name: 'Unknown', emoji: '❓', isDefault: true, createdAt: 0 };
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Reward Activities</Text>
-        <Text style={styles.subtitle}>Manage your reward activities by category</Text>
+        <Text style={styles.subtitle}>Manage your reward activities and categories</Text>
       </View>
 
-      <TouchableOpacity
-        style={[styles.addButton, activities.length >= 20 && styles.addButtonDisabled]}
-        onPress={() => setShowModal(true)}
-        disabled={activities.length >= 20}>
-        <Plus size={24} color="#FFFFFF" />
-        <Text style={styles.addButtonText}>Add Activity</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={[styles.addButton, activities.length >= 20 && styles.addButtonDisabled]}
+          onPress={() => setShowActivityModal(true)}
+          disabled={activities.length >= 20}>
+          <Plus size={20} color="#FFFFFF" />
+          <Text style={styles.addButtonText}>Add Activity</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.categoryButton}
+          onPress={() => setShowCategoryModal(true)}>
+          <Settings size={20} color="#7C3AED" />
+          <Text style={styles.categoryButtonText}>Categories</Text>
+        </TouchableOpacity>
+      </View>
 
       {activities.length > 0 && (
         <View style={styles.headerActions}>
@@ -140,7 +210,7 @@ export default function ActivitiesScreen() {
           </View>
         ) : (
           Object.entries(groupedActivities).map(([categoryKey, categoryActivities]) => {
-            const categoryInfo = ActivityCategories[categoryKey as keyof typeof ActivityCategories] || ActivityCategories.other;
+            const categoryInfo = getCategoryInfo(categoryKey);
             
             return (
               <View key={categoryKey} style={styles.categorySection}>
@@ -148,6 +218,13 @@ export default function ActivitiesScreen() {
                   <Text style={styles.categoryEmoji}>{categoryInfo.emoji}</Text>
                   <Text style={styles.categoryTitle}>{categoryInfo.name}</Text>
                   <Text style={styles.categoryCount}>({categoryActivities.length})</Text>
+                  {!categoryInfo.isDefault && (
+                    <TouchableOpacity
+                      style={styles.removeCategoryButton}
+                      onPress={() => removeCategory(categoryInfo.id)}>
+                      <X size={16} color="#EF4444" />
+                    </TouchableOpacity>
+                  )}
                 </View>
                 
                 {categoryActivities.map((activity) => (
@@ -167,12 +244,42 @@ export default function ActivitiesScreen() {
             );
           })
         )}
+
+        {/* Custom Categories Section */}
+        <View style={styles.categoriesSection}>
+          <Text style={styles.categoriesSectionTitle}>Your Categories</Text>
+          <Text style={styles.categoriesSectionDesc}>
+            Manage your custom categories. Default categories cannot be removed.
+          </Text>
+          
+          <View style={styles.categoriesGrid}>
+            {categories.map((category) => (
+              <View key={category.id} style={styles.categoryCard}>
+                <Text style={styles.categoryCardEmoji}>{category.emoji}</Text>
+                <Text style={styles.categoryCardName}>{category.name}</Text>
+                {!category.isDefault && (
+                  <TouchableOpacity
+                    style={styles.removeCategoryCardButton}
+                    onPress={() => removeCategory(category.id)}>
+                    <X size={14} color="#EF4444" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+          </View>
+        </View>
       </ScrollView>
 
       <ActivityModal
-        visible={showModal}
-        onClose={() => setShowModal(false)}
+        visible={showActivityModal}
+        onClose={() => setShowActivityModal(false)}
         onAdd={addActivity}
+      />
+
+      <CategoryModal
+        visible={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        onAdd={addCategory}
       />
     </View>
   );
@@ -200,7 +307,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6B7280',
   },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
   addButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -208,8 +321,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 24,
-    gap: 12,
-    marginBottom: 24,
+    gap: 8,
     shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -224,6 +336,23 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     fontSize: 16,
     color: '#FFFFFF',
+  },
+  categoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    gap: 8,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  categoryButtonText: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+    color: '#7C3AED',
   },
   headerActions: {
     flexDirection: 'row',
@@ -295,6 +424,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: 14,
     color: '#6B7280',
+    marginRight: 8,
+  },
+  removeCategoryButton: {
+    padding: 4,
+    borderRadius: 6,
+    backgroundColor: '#FEF2F2',
   },
   activityItem: {
     flexDirection: 'row',
@@ -331,5 +466,57 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     backgroundColor: '#FEF2F2',
+  },
+  categoriesSection: {
+    marginTop: 32,
+    marginBottom: 40,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  categoriesSectionTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 20,
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  categoriesSectionDesc: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+  },
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  categoryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minWidth: '45%',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  categoryCardEmoji: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  categoryCardName: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: '#1F2937',
+    textAlign: 'center',
+  },
+  removeCategoryCardButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 4,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 6,
   },
 });

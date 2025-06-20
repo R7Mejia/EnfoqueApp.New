@@ -24,7 +24,7 @@ export class AudioService {
   static async initializeAudio() {
     try {
       if (Platform.OS !== 'web') {
-        // Configure audio mode for background playbook
+        // Configure audio mode for background playback
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
           staysActiveInBackground: true,
@@ -57,6 +57,8 @@ export class AudioService {
 
   static async playSound(soundOption?: SoundOption) {
     try {
+      console.log('Playing sound:', soundOption);
+      
       // Stop any currently playing sound
       if (this.sound) {
         await this.sound.unloadAsync();
@@ -66,12 +68,15 @@ export class AudioService {
       if (Platform.OS === 'web') {
         // Web-specific audio handling
         if (soundOption && !soundOption.isDefault && soundOption.uri) {
+          console.log('Playing custom sound on web:', soundOption.uri);
           const audio = new window.Audio(soundOption.uri);
           audio.volume = 0.8;
-          audio.play().catch(() => {
+          audio.play().catch((error) => {
+            console.error('Web audio play error:', error);
             this.playSystemNotification();
           });
         } else {
+          console.log('Playing system notification on web');
           this.playSystemNotification();
         }
       } else {
@@ -79,39 +84,48 @@ export class AudioService {
         let source;
         
         if (soundOption && !soundOption.isDefault && soundOption.uri) {
+          console.log('Playing custom sound on mobile:', soundOption.uri);
           source = { uri: soundOption.uri };
         } else {
+          console.log('Playing default sound on mobile');
           // Use default sound based on selection
           source = require('../assets/sounds/default-bell.mp3');
         }
 
-        const { sound } = await Audio.Sound.createAsync(source, {
-          shouldPlay: true,
-          volume: 0.8,
-          isLooping: false,
-        });
-        
-        this.sound = sound;
-        
-        // Set status to ensure it plays even when screen is off
-        await sound.setStatusAsync({
-          shouldPlay: true,
-          volume: 0.8,
-          progressUpdateIntervalMillis: 1000,
-        });
-        
-        await sound.playAsync();
+        try {
+          const { sound } = await Audio.Sound.createAsync(source, {
+            shouldPlay: true,
+            volume: 1.0, // Increased volume
+            isLooping: false,
+          });
+          
+          this.sound = sound;
+          
+          // Set status to ensure it plays even when screen is off
+          await sound.setStatusAsync({
+            shouldPlay: true,
+            volume: 1.0, // Increased volume
+            progressUpdateIntervalMillis: 1000,
+          });
+          
+          await sound.playAsync();
+          console.log('Sound played successfully');
 
-        // Send notification for screen-off scenarios
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: '¡Enfoque! Focus Session Complete',
-            body: 'Great job! Time for your reward activity.',
-            sound: true,
-            priority: Notifications.AndroidNotificationPriority.HIGH,
-          },
-          trigger: null,
-        });
+          // Send notification for screen-off scenarios
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: '¡Enfoque! Focus Session Complete',
+              body: 'Great job! Time for your reward activity.',
+              sound: true,
+              priority: Notifications.AndroidNotificationPriority.HIGH,
+            },
+            trigger: null,
+          });
+        } catch (audioError) {
+          console.error('Audio creation/play error:', audioError);
+          // Fallback to system notification
+          this.playSystemNotification();
+        }
       }
     } catch (error) {
       console.error('Error playing sound:', error);
@@ -120,6 +134,7 @@ export class AudioService {
   }
 
   static playSystemNotification() {
+    console.log('Playing system notification');
     if (Platform.OS === 'web') {
       try {
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -140,12 +155,25 @@ export class AudioService {
       } catch (error) {
         console.error('Error playing system notification:', error);
       }
+    } else {
+      // For mobile, try to play a simple beep using Audio
+      try {
+        const beepSound = require('../assets/sounds/default-bell.mp3');
+        Audio.Sound.createAsync(beepSound, { shouldPlay: true, volume: 1.0 })
+          .then(({ sound }) => {
+            sound.playAsync();
+          })
+          .catch(console.error);
+      } catch (error) {
+        console.error('Error playing mobile system notification:', error);
+      }
     }
   }
 
   static async testSound(soundOption?: SoundOption) {
     try {
       this.isTestingSound = true;
+      console.log('Testing sound:', soundOption);
       
       if (this.sound) {
         await this.sound.unloadAsync();

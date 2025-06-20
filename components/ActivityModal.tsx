@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { X, Plus } from 'lucide-react-native';
-import { Activity, ActivityCategories } from '@/utils/storage';
+import { Activity, StorageService, CustomCategory } from '@/utils/storage';
 
 interface ActivityModalProps {
   visible: boolean;
@@ -22,14 +22,31 @@ interface ActivityModalProps {
 export default function ActivityModal({ visible, onClose, onAdd }: ActivityModalProps) {
   const [activityName, setActivityName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('recreation');
+  const [categories, setCategories] = useState<CustomCategory[]>([]);
+
+  useEffect(() => {
+    if (visible) {
+      loadCategories();
+    }
+  }, [visible]);
+
+  const loadCategories = async () => {
+    try {
+      const allCategories = await StorageService.getAllCategories();
+      setCategories(allCategories);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
 
   const handleAdd = () => {
     if (activityName.trim()) {
+      const selectedCat = categories.find(cat => cat.id === selectedCategory);
       const newActivity: Activity = {
         id: `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         name: activityName.trim(),
         category: selectedCategory,
-        emoji: ActivityCategories[selectedCategory as keyof typeof ActivityCategories].emoji,
+        emoji: selectedCat?.emoji || '✨',
         createdAt: Date.now(),
       };
       
@@ -91,19 +108,19 @@ export default function ActivityModal({ visible, onClose, onAdd }: ActivityModal
             </Text>
             
             <View style={styles.categoriesGrid}>
-              {Object.entries(ActivityCategories).map(([key, category]) => (
+              {categories.map((category) => (
                 <TouchableOpacity
-                  key={key}
+                  key={category.id}
                   style={[
                     styles.categoryOption,
-                    selectedCategory === key && styles.selectedCategory,
+                    selectedCategory === category.id && styles.selectedCategory,
                   ]}
-                  onPress={() => setSelectedCategory(key)}>
+                  onPress={() => setSelectedCategory(category.id)}>
                   <Text style={styles.categoryEmoji}>{category.emoji}</Text>
                   <Text
                     style={[
                       styles.categoryText,
-                      selectedCategory === key && styles.selectedCategoryText,
+                      selectedCategory === category.id && styles.selectedCategoryText,
                     ]}>
                     {category.name}
                   </Text>

@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   BACKGROUND_IMAGE: 'enfoque_background_image',
   TIMER_STATE: 'enfoque_timer_state',
   LANGUAGE: 'enfoque_language',
+  CUSTOM_CATEGORIES: 'enfoque_custom_categories',
 };
 
 export interface Activity {
@@ -18,18 +19,32 @@ export interface Activity {
   createdAt: number;
 }
 
-export const ActivityCategories = {
-  recreation: { name: 'Recreation', emoji: '🎮' },
-  exercise: { name: 'Exercise', emoji: '💪' },
-  creative: { name: 'Creative', emoji: '🎨' },
-  social: { name: 'Social', emoji: '👥' },
-  relaxation: { name: 'Relaxation', emoji: '🧘' },
-  learning: { name: 'Learning', emoji: '📚' },
-  music: { name: 'Music', emoji: '🎵' },
-  outdoor: { name: 'Outdoor', emoji: '🌳' },
-  food: { name: 'Food & Drink', emoji: '🍕' },
-  other: { name: 'Other', emoji: '✨' },
-};
+export interface CustomCategory {
+  id: string;
+  name: string;
+  emoji: string;
+  isDefault: boolean;
+  createdAt: number;
+}
+
+export const DEFAULT_CATEGORIES: CustomCategory[] = [
+  { id: 'recreation', name: 'Recreation', emoji: '🎮', isDefault: true, createdAt: 0 },
+  { id: 'exercise', name: 'Exercise', emoji: '💪', isDefault: true, createdAt: 0 },
+  { id: 'creative', name: 'Creative', emoji: '🎨', isDefault: true, createdAt: 0 },
+  { id: 'social', name: 'Social', emoji: '👥', isDefault: true, createdAt: 0 },
+  { id: 'relaxation', name: 'Relaxation', emoji: '🧘', isDefault: true, createdAt: 0 },
+  { id: 'learning', name: 'Learning', emoji: '📚', isDefault: true, createdAt: 0 },
+  { id: 'music', name: 'Music', emoji: '🎵', isDefault: true, createdAt: 0 },
+  { id: 'outdoor', name: 'Outdoor', emoji: '🌳', isDefault: true, createdAt: 0 },
+  { id: 'food', name: 'Food & Drink', emoji: '🍕', isDefault: true, createdAt: 0 },
+  { id: 'other', name: 'Other', emoji: '✨', isDefault: true, createdAt: 0 },
+];
+
+// Legacy support - convert to new format
+export const ActivityCategories = DEFAULT_CATEGORIES.reduce((acc, cat) => {
+  acc[cat.id] = { name: cat.name, emoji: cat.emoji };
+  return acc;
+}, {} as Record<string, { name: string; emoji: string }>);
 
 export const StorageService = {
   // Activities
@@ -63,6 +78,55 @@ export const StorageService = {
       await AsyncStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
     } catch (error) {
       console.error('Error saving activities:', error);
+    }
+  },
+
+  // Custom Categories
+  async getCustomCategories(): Promise<CustomCategory[]> {
+    try {
+      const categories = await AsyncStorage.getItem(STORAGE_KEYS.CUSTOM_CATEGORIES);
+      return categories ? JSON.parse(categories) : [];
+    } catch (error) {
+      console.error('Error getting custom categories:', error);
+      return [];
+    }
+  },
+
+  async saveCustomCategories(categories: CustomCategory[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.CUSTOM_CATEGORIES, JSON.stringify(categories));
+    } catch (error) {
+      console.error('Error saving custom categories:', error);
+    }
+  },
+
+  async addCustomCategory(category: CustomCategory): Promise<void> {
+    try {
+      const existingCategories = await this.getCustomCategories();
+      const updatedCategories = [...existingCategories, category];
+      await this.saveCustomCategories(updatedCategories);
+    } catch (error) {
+      console.error('Error adding custom category:', error);
+    }
+  },
+
+  async removeCustomCategory(categoryId: string): Promise<void> {
+    try {
+      const existingCategories = await this.getCustomCategories();
+      const updatedCategories = existingCategories.filter(cat => cat.id !== categoryId);
+      await this.saveCustomCategories(updatedCategories);
+    } catch (error) {
+      console.error('Error removing custom category:', error);
+    }
+  },
+
+  async getAllCategories(): Promise<CustomCategory[]> {
+    try {
+      const customCategories = await this.getCustomCategories();
+      return [...DEFAULT_CATEGORIES, ...customCategories];
+    } catch (error) {
+      console.error('Error getting all categories:', error);
+      return DEFAULT_CATEGORIES;
     }
   },
 
