@@ -19,7 +19,7 @@ import TimerDisplay from '@/components/TimerDisplay';
 import DurationSelector from '@/components/DurationSelector';
 import BreakModal from '@/components/BreakModal';
 import { StorageService, Activity } from '@/utils/storage';
-import { AudioService, SoundOption } from '@/utils/audio';
+import { AudioService, SoundOption, DEFAULT_SOUNDS } from '@/utils/audio';
 
 const { width } = Dimensions.get('window');
 
@@ -151,15 +151,38 @@ export default function FocusScreen() {
 
   const loadData = async () => {
     try {
-      const [loadedActivities, loadedBackground, loadedSound] = await Promise.all([
+      const [loadedActivities, loadedBackground, loadedSound, customSounds] = await Promise.all([
         StorageService.getActivities(),
         StorageService.getBackgroundImage(),
         StorageService.getSelectedSound(),
+        StorageService.getCustomSounds(),
       ]);
       
       setActivities(loadedActivities);
       setBackgroundImage(loadedBackground);
-      setSelectedSound(loadedSound);
+      
+      // Handle sound selection - prioritize new system, fallback to legacy
+      if (loadedSound) {
+        setSelectedSound(loadedSound);
+      } else {
+        // Check for legacy custom sound
+        const legacySound = await StorageService.getCustomSound();
+        if (legacySound) {
+          // Convert legacy sound to new format
+          const legacySoundOption: SoundOption = {
+            id: 'legacy_custom',
+            name: 'Custom Sound',
+            uri: legacySound,
+            isDefault: false,
+          };
+          setSelectedSound(legacySoundOption);
+          // Save in new format
+          await StorageService.saveSelectedSound(legacySoundOption);
+        } else {
+          // Use default sound
+          setSelectedSound(DEFAULT_SOUNDS[0]);
+        }
+      }
     } catch (error) {
       console.error('Error loading data:', error);
     }
@@ -173,8 +196,21 @@ export default function FocusScreen() {
       deactivateKeepAwake();
     }
     
-    // Play completion sound
-    await AudioService.playSound(selectedSound || undefined);
+    console.log('Timer completed, playing sound:', selectedSound);
+    
+    // Play completion sound with enhanced error handling
+    try {
+      await AudioService.playSound(selectedSound || DEFAULT_SOUNDS[0]);
+      console.log('Sound played successfully');
+    } catch (error) {
+      console.error('Error playing completion sound:', error);
+      // Try fallback sound
+      try {
+        await AudioService.playSound(DEFAULT_SOUNDS[0]);
+      } catch (fallbackError) {
+        console.error('Error playing fallback sound:', fallbackError);
+      }
+    }
     
     // Show break activity if available
     if (activities.length > 0) {

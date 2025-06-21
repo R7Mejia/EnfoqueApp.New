@@ -57,26 +57,41 @@ export class AudioService {
 
   static async playSound(soundOption?: SoundOption) {
     try {
-      console.log('Playing sound:', soundOption);
+      console.log('🔊 AudioService.playSound called with:', soundOption);
       
       // Stop any currently playing sound
       if (this.sound) {
-        await this.sound.unloadAsync();
+        try {
+          await this.sound.unloadAsync();
+        } catch (error) {
+          console.log('Error unloading previous sound:', error);
+        }
         this.sound = null;
       }
 
       if (Platform.OS === 'web') {
         // Web-specific audio handling
         if (soundOption && !soundOption.isDefault && soundOption.uri) {
-          console.log('Playing custom sound on web:', soundOption.uri);
-          const audio = new window.Audio(soundOption.uri);
-          audio.volume = 0.8;
-          audio.play().catch((error) => {
-            console.error('Web audio play error:', error);
+          console.log('🌐 Playing custom sound on web:', soundOption.uri);
+          try {
+            const audio = new window.Audio(soundOption.uri);
+            audio.volume = 0.9;
+            audio.preload = 'auto';
+            
+            // Add event listeners for debugging
+            audio.addEventListener('loadstart', () => console.log('🌐 Audio loading started'));
+            audio.addEventListener('canplay', () => console.log('🌐 Audio can play'));
+            audio.addEventListener('playing', () => console.log('🌐 Audio is playing'));
+            audio.addEventListener('error', (e) => console.error('🌐 Audio error:', e));
+            
+            await audio.play();
+            console.log('🌐 Custom sound played successfully on web');
+          } catch (error) {
+            console.error('🌐 Web custom audio play error:', error);
             this.playSystemNotification();
-          });
+          }
         } else {
-          console.log('Playing system notification on web');
+          console.log('🌐 Playing system notification on web');
           this.playSystemNotification();
         }
       } else {
@@ -84,32 +99,36 @@ export class AudioService {
         let source;
         
         if (soundOption && !soundOption.isDefault && soundOption.uri) {
-          console.log('Playing custom sound on mobile:', soundOption.uri);
+          console.log('📱 Playing custom sound on mobile:', soundOption.uri);
           source = { uri: soundOption.uri };
         } else {
-          console.log('Playing default sound on mobile');
+          console.log('📱 Playing default sound on mobile');
           // Use default sound based on selection
           source = require('../assets/sounds/default-bell.mp3');
         }
 
         try {
+          console.log('📱 Creating audio with source:', source);
+          
           const { sound } = await Audio.Sound.createAsync(source, {
-            shouldPlay: true,
-            volume: 1.0, // Increased volume
+            shouldPlay: false, // Don't auto-play, we'll control it
+            volume: 1.0,
             isLooping: false,
           });
           
           this.sound = sound;
+          console.log('📱 Audio created successfully');
           
-          // Set status to ensure it plays even when screen is off
+          // Set status and play
           await sound.setStatusAsync({
             shouldPlay: true,
-            volume: 1.0, // Increased volume
+            volume: 1.0,
             progressUpdateIntervalMillis: 1000,
           });
           
-          await sound.playAsync();
-          console.log('Sound played successfully');
+          const status = await sound.playAsync();
+          console.log('📱 Sound play status:', status);
+          console.log('📱 Custom sound played successfully on mobile');
 
           // Send notification for screen-off scenarios
           await Notifications.scheduleNotificationAsync({
@@ -122,19 +141,19 @@ export class AudioService {
             trigger: null,
           });
         } catch (audioError) {
-          console.error('Audio creation/play error:', audioError);
+          console.error('📱 Mobile audio creation/play error:', audioError);
           // Fallback to system notification
           this.playSystemNotification();
         }
       }
     } catch (error) {
-      console.error('Error playing sound:', error);
+      console.error('❌ Error in playSound:', error);
       this.playSystemNotification();
     }
   }
 
   static playSystemNotification() {
-    console.log('Playing system notification');
+    console.log('🔔 Playing system notification');
     if (Platform.OS === 'web') {
       try {
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -152,8 +171,9 @@ export class AudioService {
         
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 1.5);
+        console.log('🌐 System notification played on web');
       } catch (error) {
-        console.error('Error playing system notification:', error);
+        console.error('🌐 Error playing system notification on web:', error);
       }
     } else {
       // For mobile, try to play a simple beep using Audio
@@ -162,10 +182,11 @@ export class AudioService {
         Audio.Sound.createAsync(beepSound, { shouldPlay: true, volume: 1.0 })
           .then(({ sound }) => {
             sound.playAsync();
+            console.log('📱 System notification played on mobile');
           })
-          .catch(console.error);
+          .catch((error) => console.error('📱 Error playing mobile system notification:', error));
       } catch (error) {
-        console.error('Error playing mobile system notification:', error);
+        console.error('📱 Error creating mobile system notification:', error);
       }
     }
   }
@@ -173,7 +194,7 @@ export class AudioService {
   static async testSound(soundOption?: SoundOption) {
     try {
       this.isTestingSound = true;
-      console.log('Testing sound:', soundOption);
+      console.log('🧪 Testing sound:', soundOption);
       
       if (this.sound) {
         await this.sound.unloadAsync();
