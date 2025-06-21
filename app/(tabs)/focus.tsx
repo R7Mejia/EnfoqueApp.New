@@ -151,6 +151,8 @@ export default function FocusScreen() {
 
   const loadData = async () => {
     try {
+      console.log('🔄 Loading focus screen data...');
+      
       const [loadedActivities, loadedBackground, loadedSound, customSounds] = await Promise.all([
         StorageService.getActivities(),
         StorageService.getBackgroundImage(),
@@ -161,34 +163,43 @@ export default function FocusScreen() {
       setActivities(loadedActivities);
       setBackgroundImage(loadedBackground);
       
+      console.log('🔊 Loaded sound from storage:', loadedSound);
+      console.log('🎵 Available custom sounds:', customSounds);
+      
       // Handle sound selection - prioritize new system, fallback to legacy
       if (loadedSound) {
+        console.log('✅ Using selected sound:', loadedSound);
         setSelectedSound(loadedSound);
       } else {
         // Check for legacy custom sound
         const legacySound = await StorageService.getCustomSound();
+        console.log('🔍 Checking for legacy sound:', legacySound);
+        
         if (legacySound) {
           // Convert legacy sound to new format
           const legacySoundOption: SoundOption = {
             id: 'legacy_custom',
-            name: 'Custom Sound',
+            name: 'Custom Sound (Legacy)',
             uri: legacySound,
             isDefault: false,
           };
+          console.log('🔄 Converting legacy sound:', legacySoundOption);
           setSelectedSound(legacySoundOption);
           // Save in new format
           await StorageService.saveSelectedSound(legacySoundOption);
         } else {
           // Use default sound
+          console.log('🔔 Using default sound');
           setSelectedSound(DEFAULT_SOUNDS[0]);
         }
       }
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('❌ Error loading focus data:', error);
     }
   };
 
   const handleTimerComplete = async () => {
+    console.log('⏰ Timer completed!');
     setIsRunning(false);
     backgroundStartTime.current = null;
     
@@ -196,19 +207,26 @@ export default function FocusScreen() {
       deactivateKeepAwake();
     }
     
-    console.log('Timer completed, playing sound:', selectedSound);
+    console.log('🔊 About to play completion sound:', selectedSound);
     
     // Play completion sound with enhanced error handling
     try {
-      await AudioService.playSound(selectedSound || DEFAULT_SOUNDS[0]);
-      console.log('Sound played successfully');
+      const soundToPlay = selectedSound || DEFAULT_SOUNDS[0];
+      console.log('🎵 Playing sound:', soundToPlay);
+      
+      await AudioService.playSound(soundToPlay);
+      console.log('✅ Sound played successfully');
     } catch (error) {
-      console.error('Error playing completion sound:', error);
+      console.error('❌ Error playing completion sound:', error);
       // Try fallback sound
       try {
+        console.log('🔄 Trying fallback sound...');
         await AudioService.playSound(DEFAULT_SOUNDS[0]);
+        console.log('✅ Fallback sound played');
       } catch (fallbackError) {
-        console.error('Error playing fallback sound:', fallbackError);
+        console.error('❌ Error playing fallback sound:', fallbackError);
+        // Last resort - system notification
+        AudioService.playSystemNotification();
       }
     }
     
@@ -336,6 +354,23 @@ export default function FocusScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Debug info - remove in production */}
+          {__DEV__ && selectedSound && (
+            <View style={styles.debugInfo}>
+              <Text style={styles.debugText}>
+                Selected Sound: {selectedSound.name}
+              </Text>
+              <Text style={styles.debugText}>
+                Is Custom: {!selectedSound.isDefault ? 'Yes' : 'No'}
+              </Text>
+              {selectedSound.uri && (
+                <Text style={styles.debugText} numberOfLines={1}>
+                  URI: {selectedSound.uri}
+                </Text>
+              )}
+            </View>
+          )}
         </View>
 
         <BreakModal
@@ -460,5 +495,17 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     fontSize: 16,
     color: '#FFFFFF',
+  },
+  debugInfo: {
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  debugText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 4,
   },
 });

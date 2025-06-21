@@ -23,6 +23,8 @@ export class AudioService {
 
   static async initializeAudio() {
     try {
+      console.log('🎵 Initializing AudioService...');
+      
       if (Platform.OS !== 'web') {
         // Configure audio mode for background playback
         await Audio.setAudioModeAsync({
@@ -47,11 +49,13 @@ export class AudioService {
         // Request notification permissions
         const { status } = await Notifications.requestPermissionsAsync();
         if (status !== 'granted') {
-          console.warn('Notification permission not granted');
+          console.warn('⚠️ Notification permission not granted');
         }
       }
+      
+      console.log('✅ AudioService initialized successfully');
     } catch (error) {
-      console.error('Error initializing audio:', error);
+      console.error('❌ Error initializing audio:', error);
     }
   }
 
@@ -63,8 +67,9 @@ export class AudioService {
       if (this.sound) {
         try {
           await this.sound.unloadAsync();
+          console.log('🛑 Previous sound unloaded');
         } catch (error) {
-          console.log('Error unloading previous sound:', error);
+          console.log('⚠️ Error unloading previous sound:', error);
         }
         this.sound = null;
       }
@@ -75,19 +80,20 @@ export class AudioService {
           console.log('🌐 Playing custom sound on web:', soundOption.uri);
           try {
             const audio = new window.Audio(soundOption.uri);
-            audio.volume = 0.9;
+            audio.volume = 1.0;
             audio.preload = 'auto';
             
             // Add event listeners for debugging
             audio.addEventListener('loadstart', () => console.log('🌐 Audio loading started'));
             audio.addEventListener('canplay', () => console.log('🌐 Audio can play'));
             audio.addEventListener('playing', () => console.log('🌐 Audio is playing'));
+            audio.addEventListener('ended', () => console.log('🌐 Audio ended'));
             audio.addEventListener('error', (e) => console.error('🌐 Audio error:', e));
             
             await audio.play();
-            console.log('🌐 Custom sound played successfully on web');
+            console.log('✅ Custom sound played successfully on web');
           } catch (error) {
-            console.error('🌐 Web custom audio play error:', error);
+            console.error('❌ Web custom audio play error:', error);
             this.playSystemNotification();
           }
         } else {
@@ -100,6 +106,8 @@ export class AudioService {
         
         if (soundOption && !soundOption.isDefault && soundOption.uri) {
           console.log('📱 Playing custom sound on mobile:', soundOption.uri);
+          console.log('📱 Sound URI exists:', !!soundOption.uri);
+          console.log('📱 Sound URI length:', soundOption.uri.length);
           source = { uri: soundOption.uri };
         } else {
           console.log('📱 Playing default sound on mobile');
@@ -117,7 +125,7 @@ export class AudioService {
           });
           
           this.sound = sound;
-          console.log('📱 Audio created successfully');
+          console.log('✅ Audio created successfully');
           
           // Set status and play
           await sound.setStatusAsync({
@@ -128,7 +136,7 @@ export class AudioService {
           
           const status = await sound.playAsync();
           console.log('📱 Sound play status:', status);
-          console.log('📱 Custom sound played successfully on mobile');
+          console.log('✅ Custom sound played successfully on mobile');
 
           // Send notification for screen-off scenarios
           await Notifications.scheduleNotificationAsync({
@@ -140,8 +148,15 @@ export class AudioService {
             },
             trigger: null,
           });
+          
+          console.log('📱 Notification scheduled');
         } catch (audioError) {
-          console.error('📱 Mobile audio creation/play error:', audioError);
+          console.error('❌ Mobile audio creation/play error:', audioError);
+          console.error('❌ Error details:', {
+            message: audioError.message,
+            code: audioError.code,
+            stack: audioError.stack,
+          });
           // Fallback to system notification
           this.playSystemNotification();
         }
@@ -171,9 +186,9 @@ export class AudioService {
         
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 1.5);
-        console.log('🌐 System notification played on web');
+        console.log('✅ System notification played on web');
       } catch (error) {
-        console.error('🌐 Error playing system notification on web:', error);
+        console.error('❌ Error playing system notification on web:', error);
       }
     } else {
       // For mobile, try to play a simple beep using Audio
@@ -182,11 +197,11 @@ export class AudioService {
         Audio.Sound.createAsync(beepSound, { shouldPlay: true, volume: 1.0 })
           .then(({ sound }) => {
             sound.playAsync();
-            console.log('📱 System notification played on mobile');
+            console.log('✅ System notification played on mobile');
           })
-          .catch((error) => console.error('📱 Error playing mobile system notification:', error));
+          .catch((error) => console.error('❌ Error playing mobile system notification:', error));
       } catch (error) {
-        console.error('📱 Error creating mobile system notification:', error);
+        console.error('❌ Error creating mobile system notification:', error);
       }
     }
   }
@@ -230,7 +245,7 @@ export class AudioService {
         await sound.playAsync();
       }
     } catch (error) {
-      console.error('Error testing sound:', error);
+      console.error('❌ Error testing sound:', error);
       this.isTestingSound = false;
       throw error;
     }
@@ -252,7 +267,7 @@ export class AudioService {
         this.sound = null;
       }
     } catch (error) {
-      console.error('Error stopping test sound:', error);
+      console.error('❌ Error stopping test sound:', error);
     }
   }
 
@@ -299,7 +314,7 @@ export class AudioService {
         this.sound = null;
       }
     } catch (error) {
-      console.error('Error cleaning up sound:', error);
+      console.error('❌ Error cleaning up sound:', error);
     }
   }
 }
