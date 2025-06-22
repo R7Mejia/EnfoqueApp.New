@@ -20,6 +20,7 @@ import DurationSelector from '@/components/DurationSelector';
 import BreakModal from '@/components/BreakModal';
 import { StorageService, Activity } from '@/utils/storage';
 import { AudioService, SoundOption, DEFAULT_SOUNDS } from '@/utils/audio';
+import { vibrateOnComplete } from '@/utils/vibration';
 
 const { width } = Dimensions.get('window');
 
@@ -51,11 +52,11 @@ export default function FocusScreen() {
   const [currentActivity, setCurrentActivity] = useState<Activity | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [selectedSound, setSelectedSound] = useState<SoundOption | null>(null);
-  
+
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const appState = useRef(AppState.currentState);
   const backgroundStartTime = useRef<number | null>(null);
-  
+
   const durations = [
     { label: '30s', value: 0.5 },
     { label: '1m', value: 1 },
@@ -70,7 +71,7 @@ export default function FocusScreen() {
 
   useEffect(() => {
     loadData();
-    
+
     // Register background task
     if (Platform.OS !== 'web') {
       BackgroundFetch.registerTaskAsync(BACKGROUND_TIMER_TASK, {
@@ -81,7 +82,10 @@ export default function FocusScreen() {
     }
 
     // Handle app state changes
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    const subscription = AppState.addEventListener(
+      'change',
+      handleAppStateChange
+    );
 
     return () => {
       if (intervalRef.current) {
@@ -95,11 +99,16 @@ export default function FocusScreen() {
   }, []);
 
   const handleAppStateChange = (nextAppState: string) => {
-    if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+    if (
+      appState.current.match(/inactive|background/) &&
+      nextAppState === 'active'
+    ) {
       // App has come to the foreground
       if (isRunning && backgroundStartTime.current) {
-        const timeInBackground = Math.floor((Date.now() - backgroundStartTime.current) / 1000);
-        setTimeLeft(prevTime => {
+        const timeInBackground = Math.floor(
+          (Date.now() - backgroundStartTime.current) / 1000
+        );
+        setTimeLeft((prevTime) => {
           const newTime = Math.max(0, prevTime - timeInBackground);
           if (newTime <= 0) {
             handleTimerComplete();
@@ -112,7 +121,7 @@ export default function FocusScreen() {
       // App is going to background
       backgroundStartTime.current = Date.now();
     }
-    
+
     appState.current = nextAppState;
   };
 
@@ -121,13 +130,17 @@ export default function FocusScreen() {
       if (Platform.OS !== 'web') {
         activateKeepAwakeAsync();
       }
-      
+
       intervalRef.current = setInterval(() => {
         setTimeLeft((prevTime) => {
           const newTime = prevTime - 1;
           if (newTime <= 0) {
             handleTimerComplete();
             return 0;
+          }
+          if (newTime === 3 && selectedSound) {
+            // Preload sound 3 seconds before timer ends
+            AudioService.preloadSound(selectedSound);
           }
           return newTime;
         });
@@ -152,20 +165,21 @@ export default function FocusScreen() {
   const loadData = async () => {
     try {
       console.log('🔄 Loading focus screen data...');
-      
-      const [loadedActivities, loadedBackground, loadedSound, customSounds] = await Promise.all([
-        StorageService.getActivities(),
-        StorageService.getBackgroundImage(),
-        StorageService.getSelectedSound(),
-        StorageService.getCustomSounds(),
-      ]);
-      
+
+      const [loadedActivities, loadedBackground, loadedSound, customSounds] =
+        await Promise.all([
+          StorageService.getActivities(),
+          StorageService.getBackgroundImage(),
+          StorageService.getSelectedSound(),
+          StorageService.getCustomSounds(),
+        ]);
+
       setActivities(loadedActivities);
       setBackgroundImage(loadedBackground);
-      
+
       console.log('🔊 Loaded sound from storage:', loadedSound);
       console.log('🎵 Available custom sounds:', customSounds);
-      
+
       // Handle sound selection - prioritize new system, fallback to legacy
       if (loadedSound) {
         console.log('✅ Using selected sound:', loadedSound);
@@ -174,7 +188,7 @@ export default function FocusScreen() {
         // Check for legacy custom sound
         const legacySound = await StorageService.getCustomSound();
         console.log('🔍 Checking for legacy sound:', legacySound);
-        
+
         if (legacySound) {
           // Convert legacy sound to new format
           const legacySoundOption: SoundOption = {
@@ -202,18 +216,18 @@ export default function FocusScreen() {
     console.log('⏰ Timer completed!');
     setIsRunning(false);
     backgroundStartTime.current = null;
-    
+
     if (Platform.OS !== 'web') {
       deactivateKeepAwake();
     }
-    
+
     console.log('🔊 About to play completion sound:', selectedSound);
-    
+
     // Play completion sound with enhanced error handling
     try {
       const soundToPlay = selectedSound || DEFAULT_SOUNDS[0];
       console.log('🎵 Playing sound:', soundToPlay);
-      
+
       await AudioService.playSound(soundToPlay);
       console.log('✅ Sound played successfully');
     } catch (error) {
@@ -229,15 +243,21 @@ export default function FocusScreen() {
         AudioService.playSystemNotification();
       }
     }
-    
+
+    // Vibrate for feedback
+    vibrateOnComplete();
+
     // Show break activity if available
     if (activities.length > 0) {
-      const randomActivity = activities[Math.floor(Math.random() * activities.length)];
+      const randomActivity =
+        activities[Math.floor(Math.random() * activities.length)];
       setCurrentActivity(randomActivity);
       setShowBreakModal(true);
     } else {
       if (Platform.OS === 'web') {
-        alert('Focus Session Complete!\n\nGreat job! Add some reward activities in the Activities tab for your next break.');
+        alert(
+          'Focus Session Complete!\n\nGreat job! Add some reward activities in the Activities tab for your next break.'
+        );
       } else {
         Alert.alert(
           'Focus Session Complete!',
@@ -257,11 +277,11 @@ export default function FocusScreen() {
       }
       return;
     }
-    
+
     if (!isRunning) {
       backgroundStartTime.current = null;
     }
-    
+
     setIsRunning(!isRunning);
   };
 
@@ -269,7 +289,7 @@ export default function FocusScreen() {
     setIsRunning(false);
     setTimeLeft(selectedDuration * 60);
     backgroundStartTime.current = null;
-    
+
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -293,13 +313,15 @@ export default function FocusScreen() {
     }
   };
 
-  const defaultBackground = 'https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=1200';
+  const defaultBackground =
+    'https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=1200';
 
   return (
     <ImageBackground
       source={{ uri: backgroundImage || defaultBackground }}
       style={styles.backgroundImage}
-      blurRadius={2}>
+      blurRadius={2}
+    >
       <View style={styles.overlay}>
         <View style={styles.container}>
           <View style={styles.header}>
@@ -308,7 +330,9 @@ export default function FocusScreen() {
           </View>
 
           <View style={styles.taskSection}>
-            <Text style={styles.taskLabel}>What would you like to focus on?</Text>
+            <Text style={styles.taskLabel}>
+              What would you like to focus on?
+            </Text>
             <TextInput
               style={styles.taskInput}
               value={task}
@@ -333,17 +357,25 @@ export default function FocusScreen() {
           <TimerDisplay timeLeft={timeLeft} isRunning={isRunning} />
 
           <View style={styles.controls}>
-            <TouchableOpacity 
-              style={[styles.controlButton, isRunning && styles.controlButtonDisabled]} 
-              onPress={resetTimer}
-              disabled={isRunning}>
-              <RefreshCw size={24} color={isRunning ? "#9CA3AF" : "#4B5563"} />
-            </TouchableOpacity>
-            
             <TouchableOpacity
-              style={[styles.startButton, !task.trim() && styles.startButtonDisabled]}
+              style={[
+                styles.controlButton,
+                isRunning && styles.controlButtonDisabled,
+              ]}
+              onPress={resetTimer}
+              disabled={isRunning}
+            >
+              <RefreshCw size={24} color={isRunning ? '#9CA3AF' : '#4B5563'} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.startButton,
+                !task.trim() && styles.startButtonDisabled,
+              ]}
               onPress={toggleTimer}
-              disabled={!task.trim()}>
+              disabled={!task.trim()}
+            >
               {isRunning ? (
                 <Pause size={28} color="#FFFFFF" />
               ) : (
