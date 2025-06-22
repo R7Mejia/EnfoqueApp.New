@@ -204,7 +204,7 @@ export default function FocusScreen() {
         } else {
           // Use default sound
           console.log('🔔 Using default sound');
-          setSelectedSound(DEFAULT_SOUNDS[0]);
+          setSelectedSound(DEFAULT_SOUNDS[0] || null);
         }
       }
     } catch (error) {
@@ -222,21 +222,35 @@ export default function FocusScreen() {
     }
 
     console.log('🔊 About to play completion sound:', selectedSound);
+    console.log('🔊 Selected sound details:', {
+      id: selectedSound?.id,
+      name: selectedSound?.name,
+      uri: selectedSound?.uri,
+      isDefault: selectedSound?.isDefault,
+    });
 
     // Play completion sound with enhanced error handling
     try {
-      const soundToPlay = selectedSound || DEFAULT_SOUNDS[0];
-      console.log('🎵 Playing sound:', soundToPlay);
-
-      await AudioService.playSound(soundToPlay);
-      console.log('✅ Sound played successfully');
+      if (selectedSound) {
+        console.log('🎵 Playing selected sound:', selectedSound.name);
+        await AudioService.playSound(selectedSound);
+        console.log('✅ Selected sound played successfully');
+      } else {
+        console.log('🔔 No selected sound, playing system notification');
+        AudioService.playSystemNotification();
+      }
     } catch (error) {
       console.error('❌ Error playing completion sound:', error);
       // Try fallback sound
       try {
         console.log('🔄 Trying fallback sound...');
-        await AudioService.playSound(DEFAULT_SOUNDS[0]);
-        console.log('✅ Fallback sound played');
+        if (DEFAULT_SOUNDS.length > 0) {
+          await AudioService.playSound(DEFAULT_SOUNDS[0]);
+          console.log('✅ Fallback sound played');
+        } else {
+          AudioService.playSystemNotification();
+          console.log('✅ System notification played as fallback');
+        }
       } catch (fallbackError) {
         console.error('❌ Error playing fallback sound:', fallbackError);
         // Last resort - system notification
@@ -391,16 +405,19 @@ export default function FocusScreen() {
           {__DEV__ && selectedSound && (
             <View style={styles.debugInfo}>
               <Text style={styles.debugText}>
-                Selected Sound: {selectedSound.name}
+                🔊 Selected Sound: {selectedSound.name}
               </Text>
               <Text style={styles.debugText}>
-                Is Custom: {!selectedSound.isDefault ? 'Yes' : 'No'}
+                🎵 Is Custom: {!selectedSound.isDefault ? 'Yes' : 'No'}
               </Text>
               {selectedSound.uri && (
-                <Text style={styles.debugText} numberOfLines={1}>
-                  URI: {selectedSound.uri}
+                <Text style={styles.debugText} numberOfLines={2}>
+                  📁 URI: {selectedSound.uri}
                 </Text>
               )}
+              <Text style={styles.debugText}>
+                🆔 Sound ID: {selectedSound.id}
+              </Text>
             </View>
           )}
         </View>
