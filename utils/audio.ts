@@ -9,10 +9,8 @@ export interface SoundOption {
   isDefault: boolean;
 }
 
-export const DEFAULT_SOUNDS: SoundOption[] = [
-
-  { id: 'notification', name: 'Notification Sound', isDefault: true },
-];
+// The default sounds array is now empty, as users will load their own custom sounds dynamically.
+export const DEFAULT_SOUNDS: SoundOption[] = [];
 
 export class AudioService {
   private static sound: Audio.Sound | null = null;
