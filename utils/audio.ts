@@ -10,9 +10,7 @@ export interface SoundOption {
 }
 
 export const DEFAULT_SOUNDS: SoundOption[] = [
-  { id: 'bell', name: 'Default Bell', isDefault: true },
-  { id: 'chime', name: 'Gentle Chime', isDefault: true },
-  { id: 'ding', name: 'Simple Ding', isDefault: true },
+
   { id: 'notification', name: 'Notification Sound', isDefault: true },
 ];
 
