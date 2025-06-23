@@ -33,7 +33,7 @@ export class AudioService {
       console.log('🎵 Initializing AudioService...');
 
       if (Platform.OS !== 'web') {
-        // Configure audio mode for background playback
+        // CRITICAL: Configure audio mode for mobile with proper settings
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
           staysActiveInBackground: true,
@@ -68,9 +68,9 @@ export class AudioService {
 
   static async playSound(soundOption?: SoundOption) {
     try {
-      console.log('🔊 AudioService.playSound called with:', soundOption);
+      console.log('🔊 MOBILE AUDIO: Starting playSound with:', soundOption?.name);
 
-      // Stop any currently playing sound
+      // CRITICAL: Stop any currently playing sound first
       if (this.sound) {
         try {
           await this.sound.unloadAsync();
@@ -82,74 +82,95 @@ export class AudioService {
       }
 
       if (Platform.OS === 'web') {
-        // Web-specific audio handling
+        // Web handling (simplified)
         if (soundOption && !soundOption.isDefault && soundOption.uri) {
-          console.log('🌐 Playing custom sound on web:', soundOption.uri);
           try {
             const audio = new window.Audio(soundOption.uri);
             audio.volume = 1.0;
-            audio.preload = 'auto';
-
-            // Add event listeners for debugging
-            audio.addEventListener('loadstart', () =>
-              console.log('🌐 Audio loading started')
-            );
-            audio.addEventListener('canplay', () =>
-              console.log('🌐 Audio can play')
-            );
-            audio.addEventListener('playing', () =>
-              console.log('🌐 Audio is playing')
-            );
-            audio.addEventListener('ended', () =>
-              console.log('🌐 Audio ended')
-            );
-            audio.addEventListener('error', (e) =>
-              console.error('🌐 Audio error:', e)
-            );
-
             await audio.play();
-            console.log('✅ Custom sound played successfully on web');
-            return; // Exit early on success
+            console.log('✅ Web custom sound played');
+            return;
           } catch (error) {
-            console.error('❌ Web custom audio play error:', error);
-            // Fall through to system notification
+            console.error('❌ Web audio error:', error);
           }
         }
-        
-        console.log('🌐 Playing system notification on web');
         this.playSystemNotification();
       } else {
-        // Mobile audio handling
+        // MOBILE HANDLING - This is the critical part
+        console.log('📱 MOBILE: Processing audio for mobile device');
+        
         if (soundOption && !soundOption.isDefault && soundOption.uri) {
-          console.log('📱 Attempting to play custom sound on mobile:', soundOption.uri);
-          console.log('📱 Sound URI exists:', !!soundOption.uri);
-          console.log('📱 Sound URI length:', soundOption.uri.length);
+          console.log('📱 MOBILE: Custom sound detected:', soundOption.uri);
           
           try {
-            // Validate URI format
-            if (!soundOption.uri.startsWith('file://') && !soundOption.uri.startsWith('content://') && !soundOption.uri.startsWith('http')) {
-              throw new Error('Invalid URI format: ' + soundOption.uri);
+            // CRITICAL: Validate URI format for mobile
+            const uri = soundOption.uri;
+            console.log('📱 MOBILE: Validating URI:', uri);
+            
+            if (!uri || uri.length === 0) {
+              throw new Error('Empty URI');
             }
 
-            console.log('📱 Creating audio with custom URI:', soundOption.uri);
-
+            // CRITICAL: Create and configure audio for mobile
+            console.log('📱 MOBILE: Creating Audio.Sound with URI');
+            
             const { sound } = await Audio.Sound.createAsync(
-              { uri: soundOption.uri },
+              { uri: uri },
               {
-                shouldPlay: false,
+                shouldPlay: false, // Don't auto-play, we'll control it
                 volume: 1.0,
                 isLooping: false,
+                isMuted: false,
+              },
+              (status) => {
+                // Status callback for debugging
+                if (status.isLoaded) {
+                  console.log('📱 MOBILE: Audio loaded successfully');
+                } else if (status.error) {
+                  console.error('📱 MOBILE: Audio load error:', status.error);
+                }
               }
             );
 
             this.sound = sound;
-            console.log('✅ Custom audio created successfully');
+            console.log('📱 MOBILE: Audio object created, now playing...');
 
-            // Play the sound
-            await sound.playAsync();
-            console.log('✅ Custom sound played successfully on mobile');
+            // CRITICAL: Play the sound
+            const playbackStatus = await sound.playAsync();
+            console.log('📱 MOBILE: Play command executed, status:', playbackStatus);
 
-            // Send notification for screen-off scenarios
+            if (playbackStatus.isLoaded) {
+              console.log('✅ MOBILE: Custom sound is playing successfully!');
+              
+              // Send notification as backup
+              await Notifications.scheduleNotificationAsync({
+                content: {
+                  title: '¡Enfoque! Focus Session Complete',
+                  body: 'Great job! Time for your reward activity.',
+                  sound: false, // Don't play notification sound since we're playing custom
+                  priority: Notifications.AndroidNotificationPriority.HIGH,
+                },
+                trigger: null,
+              });
+
+              return; // SUCCESS - Exit here
+            } else {
+              throw new Error('Audio not loaded after play command');
+            }
+
+          } catch (mobileError) {
+            console.error('❌ MOBILE: Custom audio failed:', mobileError);
+            console.error('❌ MOBILE: Error details:', {
+              message: mobileError.message,
+              name: mobileError.name,
+              stack: mobileError.stack,
+            });
+            
+            // FALLBACK: Play system notification
+            console.log('📱 MOBILE: Falling back to system notification');
+            this.playSystemNotification();
+            
+            // Also send notification with sound
             await Notifications.scheduleNotificationAsync({
               content: {
                 title: '¡Enfoque! Focus Session Complete',
@@ -159,25 +180,25 @@ export class AudioService {
               },
               trigger: null,
             });
-
-            console.log('📱 Notification scheduled');
-            return; // Exit early on success
-          } catch (audioError) {
-            console.error('❌ Mobile custom audio error:', audioError);
-            console.error('❌ Error details:', {
-              message: audioError.message,
-              code: audioError.code,
-              stack: audioError.stack,
-            });
-            // Fall through to system notification
           }
+        } else {
+          // No custom sound, play default
+          console.log('📱 MOBILE: No custom sound, playing system notification');
+          this.playSystemNotification();
+          
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: '¡Enfoque! Focus Session Complete',
+              body: 'Great job! Time for your reward activity.',
+              sound: true,
+              priority: Notifications.AndroidNotificationPriority.HIGH,
+            },
+            trigger: null,
+          });
         }
-
-        console.log('📱 Playing system notification on mobile');
-        this.playSystemNotification();
       }
     } catch (error) {
-      console.error('❌ Error in playSound:', error);
+      console.error('❌ CRITICAL ERROR in playSound:', error);
       this.playSystemNotification();
     }
   }
@@ -186,11 +207,10 @@ export class AudioService {
     console.log('🔔 Playing system notification');
     if (Platform.OS === 'web') {
       try {
-        // Create a more distinctive beep sound for web
+        // Web beep sequence
         const audioContext = new (window.AudioContext ||
           (window as any).webkitAudioContext)();
         
-        // Create a sequence of beeps
         const frequencies = [800, 1000, 800];
         let startTime = audioContext.currentTime;
         
@@ -220,37 +240,45 @@ export class AudioService {
         console.error('❌ Error playing system notification on web:', error);
       }
     } else {
-      // For mobile, create a simple beep using oscillator
+      // Mobile system beep
       try {
-        // Create a simple notification sound
-        const createBeep = async () => {
-          const { sound } = await Audio.Sound.createAsync(
-            {
-              uri: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT'
-            },
-            { shouldPlay: true, volume: 0.8 }
-          );
-          
-          setTimeout(async () => {
+        console.log('📱 MOBILE: Creating system beep');
+        
+        // Create a simple beep using Audio API
+        const createMobileBeep = async () => {
+          try {
+            // Use a simple data URI for a beep sound
+            const beepUri = 'data:audio/wav;base64,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';
+            
+            const { sound } = await Audio.Sound.createAsync(
+              { uri: beepUri },
+              { shouldPlay: true, volume: 0.8 }
+            );
+            
+            setTimeout(async () => {
+              try {
+                await sound.unloadAsync();
+              } catch (e) {
+                console.log('Error unloading beep sound:', e);
+              }
+            }, 1000);
+          } catch (beepError) {
+            console.error('📱 MOBILE: Error creating beep:', beepError);
+            // Last resort - try vibration
             try {
-              await sound.unloadAsync();
-            } catch (e) {
-              console.log('Error unloading beep sound:', e);
+              const { Vibration } = require('react-native');
+              Vibration.vibrate([0, 500, 200, 500]);
+              console.log('📱 MOBILE: Vibration fallback used');
+            } catch (vibError) {
+              console.error('📱 MOBILE: Error with vibration fallback:', vibError);
             }
-          }, 1000);
+          }
         };
         
-        createBeep();
+        createMobileBeep();
         console.log('✅ System notification played on mobile');
       } catch (error) {
         console.error('❌ Error playing mobile system notification:', error);
-        // Last resort - try vibration
-        try {
-          const { Vibration } = require('react-native');
-          Vibration.vibrate([0, 500, 200, 500]);
-        } catch (vibError) {
-          console.error('❌ Error with vibration fallback:', vibError);
-        }
       }
     }
   }

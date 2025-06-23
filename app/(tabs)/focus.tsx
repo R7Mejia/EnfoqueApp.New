@@ -213,7 +213,7 @@ export default function FocusScreen() {
   };
 
   const handleTimerComplete = async () => {
-    console.log('⏰ Timer completed!');
+    console.log('⏰ MOBILE FOCUS: Timer completed!');
     setIsRunning(false);
     backgroundStartTime.current = null;
 
@@ -221,38 +221,38 @@ export default function FocusScreen() {
       deactivateKeepAwake();
     }
 
-    console.log('🔊 About to play completion sound:', selectedSound);
-    console.log('🔊 Selected sound details:', {
+    console.log('🔊 MOBILE FOCUS: About to play completion sound:', selectedSound);
+    console.log('🔊 MOBILE FOCUS: Selected sound details:', {
       id: selectedSound?.id,
       name: selectedSound?.name,
       uri: selectedSound?.uri,
       isDefault: selectedSound?.isDefault,
     });
 
-    // Play completion sound with enhanced error handling
+    // CRITICAL: Play completion sound with mobile-focused approach
     try {
       if (selectedSound) {
-        console.log('🎵 Playing selected sound:', selectedSound.name);
+        console.log('🎵 MOBILE FOCUS: Playing selected sound:', selectedSound.name);
         await AudioService.playSound(selectedSound);
-        console.log('✅ Selected sound played successfully');
+        console.log('✅ MOBILE FOCUS: Selected sound played successfully');
       } else {
-        console.log('🔔 No selected sound, playing system notification');
+        console.log('🔔 MOBILE FOCUS: No selected sound, playing system notification');
         AudioService.playSystemNotification();
       }
     } catch (error) {
-      console.error('❌ Error playing completion sound:', error);
+      console.error('❌ MOBILE FOCUS: Error playing completion sound:', error);
       // Try fallback sound
       try {
-        console.log('🔄 Trying fallback sound...');
+        console.log('🔄 MOBILE FOCUS: Trying fallback sound...');
         if (DEFAULT_SOUNDS.length > 0) {
           await AudioService.playSound(DEFAULT_SOUNDS[0]);
-          console.log('✅ Fallback sound played');
+          console.log('✅ MOBILE FOCUS: Fallback sound played');
         } else {
           AudioService.playSystemNotification();
-          console.log('✅ System notification played as fallback');
+          console.log('✅ MOBILE FOCUS: System notification played as fallback');
         }
       } catch (fallbackError) {
-        console.error('❌ Error playing fallback sound:', fallbackError);
+        console.error('❌ MOBILE FOCUS: Error playing fallback sound:', fallbackError);
         // Last resort - system notification
         AudioService.playSystemNotification();
       }
@@ -401,22 +401,17 @@ export default function FocusScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Debug info - remove in production */}
-          {__DEV__ && selectedSound && (
-            <View style={styles.debugInfo}>
+          {/* Mobile Debug info - shows sound status */}
+          {Platform.OS !== 'web' && selectedSound && (
+            <View style={styles.mobileDebugInfo}>
               <Text style={styles.debugText}>
-                🔊 Selected Sound: {selectedSound.name}
+                🔊 Sound: {selectedSound.name}
               </Text>
               <Text style={styles.debugText}>
-                🎵 Is Custom: {!selectedSound.isDefault ? 'Yes' : 'No'}
+                🎵 Custom: {!selectedSound.isDefault ? 'Yes' : 'No'}
               </Text>
-              {selectedSound.uri && (
-                <Text style={styles.debugText} numberOfLines={2}>
-                  📁 URI: {selectedSound.uri}
-                </Text>
-              )}
               <Text style={styles.debugText}>
-                🆔 Sound ID: {selectedSound.id}
+                🆔 ID: {selectedSound.id}
               </Text>
             </View>
           )}
@@ -545,16 +540,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FFFFFF',
   },
-  debugInfo: {
+  mobileDebugInfo: {
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     padding: 12,
     borderRadius: 8,
     marginTop: 20,
+    alignSelf: 'center',
   },
   debugText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontFamily: 'Inter-Regular',
     marginBottom: 4,
+    textAlign: 'center',
   },
 });
