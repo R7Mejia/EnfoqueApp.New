@@ -2,8 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 const appDescription =
-  'Designed to help you stay focused, productive, and motivated with customizable timers and rewarding break activities.';
-const copyright = `© June 23, 2025 R_Mejia developer | All Rights reserved`;
+    'Designed to help you stay focused, productive, and motivated with customizable timers and rewarding break activities.';
+const copyright = `© ${new Date().getFullYear()} R_Mejia developer | All Rights Reserved`;
 
 export default function Footer() {
   return (
