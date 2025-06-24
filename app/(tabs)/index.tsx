@@ -9,9 +9,18 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import { Clock, ListTodo, Settings, Play, Zap, Target, Brain } from 'lucide-react-native';
+import {
+  Clock,
+  ListTodo,
+  Settings,
+  Play,
+  Zap,
+  Target,
+  Brain,
+} from 'lucide-react-native';
 import { router } from 'expo-router';
 import { StorageService } from '@/utils/storage';
+import Footer from '@/components/Footer';
 
 const { width } = Dimensions.get('window');
 
@@ -31,7 +40,8 @@ export default function HomeScreen() {
     }
   };
 
-  const defaultBackground = 'https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=1200';
+  const defaultBackground =
+    'https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=1200';
 
   const features = [
     {
@@ -79,21 +89,28 @@ export default function HomeScreen() {
     <ImageBackground
       source={{ uri: backgroundImage || defaultBackground }}
       style={styles.backgroundImage}
-      blurRadius={2}>
+      blurRadius={2}
+    >
       <View style={styles.overlay}>
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.container}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.header}>
             <Text style={styles.title}>¡Enfoque!</Text>
-            <Text style={styles.subtitle}>Your ADHD-Friendly Focus Companion</Text>
+            <Text style={styles.subtitle}>
+              Your ADHD-Friendly Focus Companion
+            </Text>
             <Text style={styles.description}>
-              Designed to help you stay focused, productive, and motivated with 
+              Designed to help you stay focused, productive, and motivated with
               customizable timers and rewarding break activities.
             </Text>
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.quickStartButton}
-            onPress={() => router.push('/focus')}>
+            onPress={() => router.push('/focus')}
+          >
             <Play size={24} color="#FFFFFF" />
             <Text style={styles.quickStartText}>Quick Start Focus Session</Text>
           </TouchableOpacity>
@@ -104,13 +121,21 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={index}
                 style={styles.featureCard}
-                onPress={() => router.push(feature.route)}>
-                <View style={[styles.featureIcon, { backgroundColor: `${feature.color}20` }]}>
+                onPress={() => router.push(feature.route)}
+              >
+                <View
+                  style={[
+                    styles.featureIcon,
+                    { backgroundColor: `${feature.color}20` },
+                  ]}
+                >
                   <feature.icon size={28} color={feature.color} />
                 </View>
                 <View style={styles.featureContent}>
                   <Text style={styles.featureTitle}>{feature.title}</Text>
-                  <Text style={styles.featureDescription}>{feature.description}</Text>
+                  <Text style={styles.featureDescription}>
+                    {feature.description}
+                  </Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -139,7 +164,8 @@ export default function HomeScreen() {
                   <Text style={styles.stepText}>1</Text>
                 </View>
                 <Text style={styles.instructionText}>
-                  Set your task and choose a focus duration (30 seconds to 1 hour)
+                  Set your task and choose a focus duration (30 seconds to 1
+                  hour)
                 </Text>
               </View>
               <View style={styles.instructionItem}>
@@ -163,11 +189,14 @@ export default function HomeScreen() {
                   <Text style={styles.stepText}>4</Text>
                 </View>
                 <Text style={styles.instructionText}>
-                  Customize sounds, backgrounds, and activities to your preferences
+                  Customize sounds, backgrounds, and activities to your
+                  preferences
                 </Text>
               </View>
             </View>
           </View>
+
+          <Footer />
         </ScrollView>
       </View>
     </ImageBackground>
