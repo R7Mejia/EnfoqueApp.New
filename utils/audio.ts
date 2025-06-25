@@ -68,7 +68,11 @@ export class AudioService {
 
   static async playSound(soundOption?: SoundOption) {
     try {
-      console.log('🔊 AUDIO: Starting playSound with:', soundOption?.name);
+      console.log(
+        '🔊 AUDIO: Starting playSound with:',
+        soundOption?.name,
+        soundOption?.uri
+      );
 
       // Stop any currently playing sound first
       if (this.sound) {
@@ -82,16 +86,26 @@ export class AudioService {
       }
 
       if (soundOption && soundOption.uri) {
+        let uri = soundOption.uri;
+        // If on mobile and the URI is not a remote URL, ensure it has file://
+        if (
+          Platform.OS !== 'web' &&
+          !uri.startsWith('http') &&
+          !uri.startsWith('file://')
+        ) {
+          uri = 'file://' + uri;
+        }
+        console.log('🔊 Attempting to play URI:', uri);
         try {
           if (Platform.OS === 'web') {
-            const audio = new window.Audio(soundOption.uri);
+            const audio = new window.Audio(uri);
             audio.volume = 1.0;
             await audio.play();
             console.log('✅ Web custom sound played');
             return;
           } else {
             const { sound } = await Audio.Sound.createAsync(
-              { uri: soundOption.uri },
+              { uri },
               {
                 shouldPlay: true,
                 volume: 1.0,
@@ -104,7 +118,7 @@ export class AudioService {
             return;
           }
         } catch (error) {
-          console.error('❌ Error playing custom sound:', error);
+          console.error('❌ Error playing custom sound:', error, 'URI:', uri);
           // Fallback: vibration only
           try {
             Vibration.vibrate([0, 500, 200, 500]);
