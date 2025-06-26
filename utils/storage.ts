@@ -159,7 +159,7 @@ export const StorageService = {
     }
   },
 
-  async removeCustomSound(soundId: string): Promise<void> {
+  async removeCustomSoundById(soundId: string): Promise<void> {
     try {
       const existingSounds = await this.getCustomSounds();
       const updatedSounds = existingSounds.filter(sound => sound.id !== soundId);
