@@ -42,7 +42,7 @@ TaskManager.defineTask(BACKGROUND_TIMER_TASK, async ({ data, error }) => {
   }
 });
 
-export default function FocusScreen() {
+function FocusScreen() {
   const [task, setTask] = useState('');
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
@@ -221,7 +221,10 @@ export default function FocusScreen() {
       deactivateKeepAwake();
     }
 
-    console.log('🔊 MOBILE FOCUS: About to play completion sound:', selectedSound);
+    console.log(
+      '🔊 MOBILE FOCUS: About to play completion sound:',
+      selectedSound
+    );
     console.log('🔊 MOBILE FOCUS: Selected sound details:', {
       id: selectedSound?.id,
       name: selectedSound?.name,
@@ -232,11 +235,16 @@ export default function FocusScreen() {
     // CRITICAL: Play completion sound with mobile-focused approach
     try {
       if (selectedSound) {
-        console.log('🎵 MOBILE FOCUS: Playing selected sound:', selectedSound.name);
+        console.log(
+          '🎵 MOBILE FOCUS: Playing selected sound:',
+          selectedSound.name
+        );
         await AudioService.playSound(selectedSound);
         console.log('✅ MOBILE FOCUS: Selected sound played successfully');
       } else {
-        console.log('🔔 MOBILE FOCUS: No selected sound, playing system notification');
+        console.log(
+          '🔔 MOBILE FOCUS: No selected sound, playing system notification'
+        );
         AudioService.playSystemNotification();
       }
     } catch (error) {
@@ -249,10 +257,15 @@ export default function FocusScreen() {
           console.log('✅ MOBILE FOCUS: Fallback sound played');
         } else {
           AudioService.playSystemNotification();
-          console.log('✅ MOBILE FOCUS: System notification played as fallback');
+          console.log(
+            '✅ MOBILE FOCUS: System notification played as fallback'
+          );
         }
       } catch (fallbackError) {
-        console.error('❌ MOBILE FOCUS: Error playing fallback sound:', fallbackError);
+        console.error(
+          '❌ MOBILE FOCUS: Error playing fallback sound:',
+          fallbackError
+        );
         // Last resort - system notification
         AudioService.playSystemNotification();
       }
@@ -410,9 +423,7 @@ export default function FocusScreen() {
               <Text style={styles.debugText}>
                 🎵 Custom: {!selectedSound.isDefault ? 'Yes' : 'No'}
               </Text>
-              <Text style={styles.debugText}>
-                🆔 ID: {selectedSound.id}
-              </Text>
+              <Text style={styles.debugText}>🆔 ID: {selectedSound.id}</Text>
             </View>
           )}
         </View>
@@ -555,3 +566,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export default FocusScreen;

@@ -13,7 +13,7 @@ import ActivityModal from '@/components/ActivityModal';
 import CategoryModal from '@/components/CategoryModal';
 import { StorageService, Activity, CustomCategory } from '@/utils/storage';
 
-export default function ActivitiesScreen() {
+function ActivitiesScreen() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [categories, setCategories] = useState<CustomCategory[]>([]);
   const [showActivityModal, setShowActivityModal] = useState(false);
@@ -86,13 +86,20 @@ export default function ActivitiesScreen() {
 
   const removeCategory = async (categoryId: string) => {
     // Check if category is being used by any activities
-    const isUsed = activities.some(activity => activity.category === categoryId);
-    
+    const isUsed = activities.some(
+      (activity) => activity.category === categoryId
+    );
+
     if (isUsed) {
       if (Platform.OS === 'web') {
-        alert('Cannot Remove Category\n\nThis category is being used by one or more activities. Please remove or reassign those activities first.');
+        alert(
+          'Cannot Remove Category\n\nThis category is being used by one or more activities. Please remove or reassign those activities first.'
+        );
       } else {
-        Alert.alert('Cannot Remove Category', 'This category is being used by one or more activities. Please remove or reassign those activities first.');
+        Alert.alert(
+          'Cannot Remove Category',
+          'This category is being used by one or more activities. Please remove or reassign those activities first.'
+        );
       }
       return;
     }
@@ -130,7 +137,11 @@ export default function ActivitiesScreen() {
     };
 
     if (Platform.OS === 'web') {
-      if (confirm('Are you sure you want to remove all activities? This cannot be undone.')) {
+      if (
+        confirm(
+          'Are you sure you want to remove all activities? This cannot be undone.'
+        )
+      ) {
         confirmClear();
       }
     } else {
@@ -159,29 +170,43 @@ export default function ActivitiesScreen() {
   }, {} as Record<string, Activity[]>);
 
   const getCategoryInfo = (categoryId: string) => {
-    return categories.find(cat => cat.id === categoryId) || 
-           { id: categoryId, name: 'Unknown', emoji: '❓', isDefault: true, createdAt: 0 };
+    return (
+      categories.find((cat) => cat.id === categoryId) || {
+        id: categoryId,
+        name: 'Unknown',
+        emoji: '❓',
+        isDefault: true,
+        createdAt: 0,
+      }
+    );
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Reward Activities</Text>
-        <Text style={styles.subtitle}>Manage your reward activities and categories</Text>
+        <Text style={styles.subtitle}>
+          Manage your reward activities and categories
+        </Text>
       </View>
 
       <View style={styles.buttonRow}>
         <TouchableOpacity
-          style={[styles.addButton, activities.length >= 20 && styles.addButtonDisabled]}
+          style={[
+            styles.addButton,
+            activities.length >= 20 && styles.addButtonDisabled,
+          ]}
           onPress={() => setShowActivityModal(true)}
-          disabled={activities.length >= 20}>
+          disabled={activities.length >= 20}
+        >
           <Plus size={20} color="#FFFFFF" />
           <Text style={styles.addButtonText}>Add Activity</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.categoryButton}
-          onPress={() => setShowCategoryModal(true)}>
+          onPress={() => setShowCategoryModal(true)}
+        >
           <Settings size={20} color="#7C3AED" />
           <Text style={styles.categoryButtonText}>Categories</Text>
         </TouchableOpacity>
@@ -189,60 +214,77 @@ export default function ActivitiesScreen() {
 
       {activities.length > 0 && (
         <View style={styles.headerActions}>
-          <Text style={styles.counter}>
-            {activities.length}/20 activities
-          </Text>
-          <TouchableOpacity onPress={clearAllActivities} style={styles.clearButton}>
+          <Text style={styles.counter}>{activities.length}/20 activities</Text>
+          <TouchableOpacity
+            onPress={clearAllActivities}
+            style={styles.clearButton}
+          >
             <Trash2 size={16} color="#EF4444" />
             <Text style={styles.clearButtonText}>Clear All</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      <ScrollView style={styles.activitiesList} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.activitiesList}
+        showsVerticalScrollIndicator={false}
+      >
         {activities.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No activities yet</Text>
             <Text style={styles.emptyDescription}>
-              Add some motivational activities that you enjoy doing during breaks.
-              These will be randomly suggested when your focus sessions end.
+              Add some motivational activities that you enjoy doing during
+              breaks. These will be randomly suggested when your focus sessions
+              end.
             </Text>
           </View>
         ) : (
-          Object.entries(groupedActivities).map(([categoryKey, categoryActivities]) => {
-            const categoryInfo = getCategoryInfo(categoryKey);
-            
-            return (
-              <View key={categoryKey} style={styles.categorySection}>
-                <View style={styles.categoryHeader}>
-                  <Text style={styles.categoryEmoji}>{categoryInfo.emoji}</Text>
-                  <Text style={styles.categoryTitle}>{categoryInfo.name}</Text>
-                  <Text style={styles.categoryCount}>({categoryActivities.length})</Text>
-                  {!categoryInfo.isDefault && (
-                    <TouchableOpacity
-                      style={styles.removeCategoryButton}
-                      onPress={() => removeCategory(categoryInfo.id)}>
-                      <X size={16} color="#EF4444" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-                
-                {categoryActivities.map((activity) => (
-                  <View key={activity.id} style={styles.activityItem}>
-                    <View style={styles.activityContent}>
-                      <Text style={styles.activityEmoji}>{activity.emoji}</Text>
-                      <Text style={styles.activityText}>{activity.name}</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => removeActivity(activity.id)}>
-                      <X size={20} color="#EF4444" />
-                    </TouchableOpacity>
+          Object.entries(groupedActivities).map(
+            ([categoryKey, categoryActivities]) => {
+              const categoryInfo = getCategoryInfo(categoryKey);
+
+              return (
+                <View key={categoryKey} style={styles.categorySection}>
+                  <View style={styles.categoryHeader}>
+                    <Text style={styles.categoryEmoji}>
+                      {categoryInfo.emoji}
+                    </Text>
+                    <Text style={styles.categoryTitle}>
+                      {categoryInfo.name}
+                    </Text>
+                    <Text style={styles.categoryCount}>
+                      ({categoryActivities.length})
+                    </Text>
+                    {!categoryInfo.isDefault && (
+                      <TouchableOpacity
+                        style={styles.removeCategoryButton}
+                        onPress={() => removeCategory(categoryInfo.id)}
+                      >
+                        <X size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    )}
                   </View>
-                ))}
-              </View>
-            );
-          })
+
+                  {categoryActivities.map((activity) => (
+                    <View key={activity.id} style={styles.activityItem}>
+                      <View style={styles.activityContent}>
+                        <Text style={styles.activityEmoji}>
+                          {activity.emoji}
+                        </Text>
+                        <Text style={styles.activityText}>{activity.name}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.removeButton}
+                        onPress={() => removeActivity(activity.id)}
+                      >
+                        <X size={20} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              );
+            }
+          )
         )}
 
         {/* Custom Categories Section */}
@@ -251,7 +293,7 @@ export default function ActivitiesScreen() {
           <Text style={styles.categoriesSectionDesc}>
             Manage your custom categories. Default categories cannot be removed.
           </Text>
-          
+
           <View style={styles.categoriesGrid}>
             {categories.map((category) => (
               <View key={category.id} style={styles.categoryCard}>
@@ -260,7 +302,8 @@ export default function ActivitiesScreen() {
                 {!category.isDefault && (
                   <TouchableOpacity
                     style={styles.removeCategoryCardButton}
-                    onPress={() => removeCategory(category.id)}>
+                    onPress={() => removeCategory(category.id)}
+                  >
                     <X size={14} color="#EF4444" />
                   </TouchableOpacity>
                 )}
@@ -520,3 +563,5 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
 });
+
+export default ActivitiesScreen;

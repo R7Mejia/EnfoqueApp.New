@@ -27,7 +27,7 @@ import { AudioService, SoundOption, DEFAULT_SOUNDS } from '@/utils/audio';
 import { getTranslation } from '@/utils/translations';
 import FileSystem from '@/utils/fileSystemProxy';
 
-export default function SettingsScreen() {
+function SettingsScreen() {
   const [customSounds, setCustomSounds] = useState<SoundOption[]>([]);
   const [selectedSound, setSelectedSound] = useState<SoundOption | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
@@ -722,3 +722,5 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
   },
 });
+
+export default SettingsScreen;

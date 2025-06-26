@@ -24,7 +24,7 @@ import Footer from '@/components/Footer';
 
 const { width } = Dimensions.get('window');
 
-export default function HomeScreen() {
+function HomeScreen() {
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -379,3 +379,5 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
 });
+
+export default HomeScreen;
