@@ -49,21 +49,21 @@ export default function HomeScreen() {
       title: 'Focus Timer',
       description: 'Start focused work sessions with customizable durations',
       color: '#7C3AED',
-      route: '/focus',
+      route: '/(tabs)/focus',
     },
     {
       icon: ListTodo,
       title: 'Reward Activities',
       description: 'Manage your motivational break activities',
       color: '#059669',
-      route: '/activities',
+      route: '/(tabs)/activities',
     },
     {
       icon: Settings,
       title: 'Customize',
       description: 'Personalize sounds, backgrounds, and preferences',
       color: '#DC2626',
-      route: '/settings',
+      route: '/(tabs)/settings',
     },
   ];
 
@@ -109,7 +109,7 @@ export default function HomeScreen() {
 
           <TouchableOpacity
             style={styles.quickStartButton}
-            onPress={() => router.push('/focus')}
+            onPress={() => router.push('/(tabs)/focus')}
           >
             <Play size={24} color="#FFFFFF" />
             <Text style={styles.quickStartText}>Quick Start Focus Session</Text>
@@ -121,7 +121,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={index}
                 style={styles.featureCard}
-                onPress={() => router.push(feature.route)}
+                onPress={() => router.push(feature.route as any)}
               >
                 <View
                   style={[
