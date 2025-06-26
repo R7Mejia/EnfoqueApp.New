@@ -1,5 +1,5 @@
 import { Audio } from 'expo-av';
-import { Platform, Vibration } from 'react-native';
+import { Platform, Vibration, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
 export interface SoundOption {
@@ -104,6 +104,12 @@ export class AudioService {
             console.log('✅ Web custom sound played');
             return;
           } else {
+            // Check file existence before playing
+            const FileSystem = require('@/utils/fileSystemProxy').default;
+            const fileInfo = await FileSystem.getInfoAsync(uri);
+            if (!fileInfo.exists) {
+              throw new Error('Audio file does not exist at URI: ' + uri);
+            }
             const { sound } = await Audio.Sound.createAsync(
               { uri },
               {
@@ -119,6 +125,12 @@ export class AudioService {
           }
         } catch (error) {
           console.error('❌ Error playing custom sound:', error, 'URI:', uri);
+          if (Platform.OS !== 'web') {
+            Alert.alert(
+              'Audio Error',
+              'Could not play your custom sound. Please try re-uploading or pick a different file.'
+            );
+          }
           // Fallback: vibration only
           try {
             Vibration.vibrate([0, 500, 200, 500]);

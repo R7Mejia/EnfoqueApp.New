@@ -9,12 +9,23 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
-import { Upload, Volume2, Trash2, Image as ImageIcon, Square, Globe, Play, Pause, ChevronDown } from 'lucide-react-native';
+import {
+  Upload,
+  Volume2,
+  Trash2,
+  Image as ImageIcon,
+  Square,
+  Globe,
+  Play,
+  Pause,
+  ChevronDown,
+} from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { StorageService } from '@/utils/storage';
 import { AudioService, SoundOption, DEFAULT_SOUNDS } from '@/utils/audio';
 import { getTranslation } from '@/utils/translations';
+import FileSystem from '@/utils/fileSystemProxy';
 
 export default function SettingsScreen() {
   const [customSounds, setCustomSounds] = useState<SoundOption[]>([]);
@@ -43,7 +54,7 @@ export default function SettingsScreen() {
         StorageService.getBackgroundImage(),
         StorageService.getLanguage(),
       ]);
-      
+
       setCustomSounds(sounds);
       setSelectedSound(selected || DEFAULT_SOUNDS[0]);
       setBackgroundImage(image);
@@ -59,11 +70,19 @@ export default function SettingsScreen() {
     try {
       await StorageService.saveLanguage(languageCode);
       setCurrentLanguage(languageCode);
-      
+
       if (Platform.OS === 'web') {
-        alert(`${getTranslation(languageCode, 'success')}\n\n${getTranslation(languageCode, 'languageChanged')}`);
+        alert(
+          `${getTranslation(languageCode, 'success')}\n\n${getTranslation(
+            languageCode,
+            'languageChanged'
+          )}`
+        );
       } else {
-        Alert.alert(getTranslation(languageCode, 'success'), getTranslation(languageCode, 'languageChanged'));
+        Alert.alert(
+          getTranslation(languageCode, 'success'),
+          getTranslation(languageCode, 'languageChanged')
+        );
       }
     } catch (error) {
       console.error('Error changing language:', error);
@@ -79,16 +98,31 @@ export default function SettingsScreen() {
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
+        let uri = asset.uri;
+        // Normalize URI for mobile
+        if (Platform.OS !== 'web') {
+          if (uri.startsWith('content://')) {
+            // Try to get a file path from content URI
+            try {
+              const fileInfo = await FileSystem.getInfoAsync(uri);
+              if (fileInfo.exists && fileInfo.uri) {
+                uri = fileInfo.uri;
+              }
+            } catch (e) {
+              console.warn('Could not resolve content URI, using as-is:', uri);
+            }
+          } else if (!uri.startsWith('file://')) {
+            uri = 'file://' + uri;
+          }
+        }
         const newSound: SoundOption = {
           id: `custom_${Date.now()}`,
           name: asset.name,
-          uri: asset.uri,
+          uri,
           isDefault: false,
         };
-        
         await StorageService.addCustomSound(newSound);
-        setCustomSounds(prev => [...prev, newSound]);
-        
+        setCustomSounds((prev) => [...prev, newSound]);
         if (Platform.OS === 'web') {
           alert(`${t('success')}\n\n${t('soundUploaded')}`);
         } else {
@@ -108,8 +142,8 @@ export default function SettingsScreen() {
   const removeCustomSound = async (soundId: string) => {
     const confirmRemove = async () => {
       await StorageService.removeCustomSound(soundId);
-      setCustomSounds(prev => prev.filter(sound => sound.id !== soundId));
-      
+      setCustomSounds((prev) => prev.filter((sound) => sound.id !== soundId));
+
       // If the removed sound was selected, reset to default
       if (selectedSound?.id === soundId) {
         const defaultSound = DEFAULT_SOUNDS[0];
@@ -123,18 +157,14 @@ export default function SettingsScreen() {
         confirmRemove();
       }
     } else {
-      Alert.alert(
-        t('removeSound'),
-        t('removeSoundMessage'),
-        [
-          { text: t('cancel'), style: 'cancel' },
-          {
-            text: t('remove'),
-            style: 'destructive',
-            onPress: confirmRemove,
-          },
-        ]
-      );
+      Alert.alert(t('removeSound'), t('removeSoundMessage'), [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('remove'),
+          style: 'destructive',
+          onPress: confirmRemove,
+        },
+      ]);
     }
   };
 
@@ -172,10 +202,14 @@ export default function SettingsScreen() {
   const pickBackgroundImage = async () => {
     try {
       if (Platform.OS !== 'web') {
-        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        
+        const permissionResult =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+
         if (permissionResult.granted === false) {
-          Alert.alert('Permission Required', 'Permission to access camera roll is required!');
+          Alert.alert(
+            'Permission Required',
+            'Permission to access camera roll is required!'
+          );
           return;
         }
       }
@@ -191,7 +225,7 @@ export default function SettingsScreen() {
         const asset = result.assets[0];
         await StorageService.saveBackgroundImage(asset.uri);
         setBackgroundImage(asset.uri);
-        
+
         if (Platform.OS === 'web') {
           alert(`${t('success')}\n\n${t('backgroundUpdated')}`);
         } else {
@@ -219,18 +253,14 @@ export default function SettingsScreen() {
         confirmRemove();
       }
     } else {
-      Alert.alert(
-        t('removeBackground'),
-        t('removeBackgroundMessage'),
-        [
-          { text: t('cancel'), style: 'cancel' },
-          {
-            text: t('remove'),
-            style: 'destructive',
-            onPress: confirmRemove,
-          },
-        ]
-      );
+      Alert.alert(t('removeBackground'), t('removeBackgroundMessage'), [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('remove'),
+          style: 'destructive',
+          onPress: confirmRemove,
+        },
+      ]);
     }
   };
 
@@ -246,9 +276,7 @@ export default function SettingsScreen() {
       {/* Language Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('language')}</Text>
-        <Text style={styles.sectionDescription}>
-          {t('languageDesc')}
-        </Text>
+        <Text style={styles.sectionDescription}>{t('languageDesc')}</Text>
 
         <View style={styles.languageOptions}>
           {languages.map((language) => (
@@ -256,18 +284,24 @@ export default function SettingsScreen() {
               key={language.code}
               style={[
                 styles.languageOption,
-                currentLanguage === language.code && styles.selectedLanguageOption,
+                currentLanguage === language.code &&
+                  styles.selectedLanguageOption,
               ]}
-              onPress={() => changeLanguage(language.code)}>
-              <Globe 
-                size={20} 
-                color={currentLanguage === language.code ? '#7C3AED' : '#6B7280'} 
+              onPress={() => changeLanguage(language.code)}
+            >
+              <Globe
+                size={20}
+                color={
+                  currentLanguage === language.code ? '#7C3AED' : '#6B7280'
+                }
               />
               <Text
                 style={[
                   styles.languageOptionText,
-                  currentLanguage === language.code && styles.selectedLanguageText,
-                ]}>
+                  currentLanguage === language.code &&
+                    styles.selectedLanguageText,
+                ]}
+              >
                 {language.name}
               </Text>
               {currentLanguage === language.code && (
@@ -287,16 +321,23 @@ export default function SettingsScreen() {
 
         {backgroundImage && (
           <View style={styles.currentBackground}>
-            <Image source={{ uri: backgroundImage }} style={styles.backgroundPreview} />
+            <Image
+              source={{ uri: backgroundImage }}
+              style={styles.backgroundPreview}
+            />
             <TouchableOpacity
               style={styles.removeImageButton}
-              onPress={removeBackgroundImage}>
+              onPress={removeBackgroundImage}
+            >
               <Trash2 size={16} color="#EF4444" />
             </TouchableOpacity>
           </View>
         )}
 
-        <TouchableOpacity style={styles.backgroundButton} onPress={pickBackgroundImage}>
+        <TouchableOpacity
+          style={styles.backgroundButton}
+          onPress={pickBackgroundImage}
+        >
           <ImageIcon size={20} color="#7C3AED" />
           <Text style={styles.backgroundButtonText}>
             {backgroundImage ? t('changeBackground') : t('chooseBackground')}
@@ -307,15 +348,14 @@ export default function SettingsScreen() {
       {/* Timer Sound Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('timerSound')}</Text>
-        <Text style={styles.sectionDescription}>
-          {t('timerSoundDesc')}
-        </Text>
+        <Text style={styles.sectionDescription}>{t('timerSoundDesc')}</Text>
 
         {/* Sound Selector Dropdown */}
         <View style={styles.soundSelector}>
           <TouchableOpacity
             style={styles.soundDropdownButton}
-            onPress={() => setShowSoundDropdown(!showSoundDropdown)}>
+            onPress={() => setShowSoundDropdown(!showSoundDropdown)}
+          >
             <Volume2 size={20} color="#7C3AED" />
             <Text style={styles.soundDropdownText}>
               {selectedSound?.name || 'Select Sound'}
@@ -330,36 +370,47 @@ export default function SettingsScreen() {
                   <TouchableOpacity
                     style={[
                       styles.soundOptionButton,
-                      selectedSound?.id === sound.id && styles.selectedSoundOption,
+                      selectedSound?.id === sound.id &&
+                        styles.selectedSoundOption,
                     ]}
-                    onPress={() => selectSound(sound)}>
+                    onPress={() => selectSound(sound)}
+                  >
                     <Text
                       style={[
                         styles.soundOptionText,
-                        selectedSound?.id === sound.id && styles.selectedSoundText,
-                      ]}>
+                        selectedSound?.id === sound.id &&
+                          styles.selectedSoundText,
+                      ]}
+                    >
                       {sound.name}
                     </Text>
                     {selectedSound?.id === sound.id && (
                       <View style={styles.selectedIndicator} />
                     )}
                   </TouchableOpacity>
-                  
+
                   <View style={styles.soundControls}>
                     <TouchableOpacity
-                      style={[styles.testButton, isTestingSound && styles.testButtonActive]}
-                      onPress={() => isTestingSound ? stopTestSound() : testSound(sound)}>
+                      style={[
+                        styles.testButton,
+                        isTestingSound && styles.testButtonActive,
+                      ]}
+                      onPress={() =>
+                        isTestingSound ? stopTestSound() : testSound(sound)
+                      }
+                    >
                       {isTestingSound ? (
                         <Pause size={16} color="#EF4444" />
                       ) : (
                         <Play size={16} color="#7C3AED" />
                       )}
                     </TouchableOpacity>
-                    
+
                     {!sound.isDefault && (
                       <TouchableOpacity
                         style={styles.removeButton}
-                        onPress={() => removeCustomSound(sound.id)}>
+                        onPress={() => removeCustomSound(sound.id)}
+                      >
                         <Trash2 size={16} color="#EF4444" />
                       </TouchableOpacity>
                     )}
@@ -387,26 +438,34 @@ export default function SettingsScreen() {
       {/* ADHD Tips Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('adhdFeatures')}</Text>
-        <Text style={styles.sectionDescription}>
-          {t('adhdFeaturesDesc')}
-        </Text>
-        
+        <Text style={styles.sectionDescription}>{t('adhdFeaturesDesc')}</Text>
+
         <View style={styles.featuresList}>
           <View style={styles.featureItem}>
             <Text style={styles.featureTitle}>{t('flexibleDurations')}</Text>
-            <Text style={styles.featureDescription}>{t('flexibleDurationsDesc')}</Text>
+            <Text style={styles.featureDescription}>
+              {t('flexibleDurationsDesc')}
+            </Text>
           </View>
           <View style={styles.featureItem}>
             <Text style={styles.featureTitle}>{t('screenOffAlerts')}</Text>
-            <Text style={styles.featureDescription}>{t('screenOffAlertsDesc')}</Text>
+            <Text style={styles.featureDescription}>
+              {t('screenOffAlertsDesc')}
+            </Text>
           </View>
           <View style={styles.featureItem}>
             <Text style={styles.featureTitle}>{t('rewardSystem')}</Text>
-            <Text style={styles.featureDescription}>{t('rewardSystemDesc')}</Text>
+            <Text style={styles.featureDescription}>
+              {t('rewardSystemDesc')}
+            </Text>
           </View>
           <View style={styles.featureItem}>
-            <Text style={styles.featureTitle}>{t('personalCustomization')}</Text>
-            <Text style={styles.featureDescription}>{t('personalCustomizationDesc')}</Text>
+            <Text style={styles.featureTitle}>
+              {t('personalCustomization')}
+            </Text>
+            <Text style={styles.featureDescription}>
+              {t('personalCustomizationDesc')}
+            </Text>
           </View>
         </View>
       </View>
