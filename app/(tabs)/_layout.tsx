@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import { Clock, ListTodo, Settings, Chrome as Home } from 'lucide-react-native';
 import { StyleSheet, Platform } from 'react-native';
 
-export default function TabLayout() {
+export default function () {
   return (
     <Tabs
       screenOptions={{
@@ -12,7 +12,8 @@ export default function TabLayout() {
         tabBarInactiveTintColor: '#9CA3AF',
         tabBarLabelStyle: styles.tabBarLabel,
         tabBarItemStyle: styles.tabBarItem,
-      }}>
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
@@ -31,14 +32,18 @@ export default function TabLayout() {
         name="activities"
         options={{
           title: 'Activities',
-          tabBarIcon: ({ color, size }) => <ListTodo size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <ListTodo size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color, size }) => <Settings size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Settings size={size} color={color} />
+          ),
         }}
       />
     </Tabs>
@@ -60,7 +65,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   tabBarLabel: {
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: Platform.OS === 'web' ? 'sans-serif' : 'Inter-SemiBold',
     fontSize: 12,
     marginTop: 4,
   },
