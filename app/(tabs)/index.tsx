@@ -24,7 +24,7 @@ import Footer from '@/components/Footer';
 
 const { width } = Dimensions.get('window');
 
-export default function HomeScreen() {
+export default function () {
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
 
   useEffect(() => {
